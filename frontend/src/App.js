@@ -1,17 +1,37 @@
-// frontend/src/App.js (Son ve Temiz Düzen)
-
 import React, { useState, useEffect } from 'react';
-// Yeni konumdan servisleri ve sayfaları import edin:
 import { supabase } from './Servisler/supabaseServis';
-import GirisKayit from './Sayfalar/GirisKayit'; // Giriş/Kayıt
-import AramaSayfasi from './Sayfalar/AramaSayfasi'; // Arama Sayfası
+import GirisKayit from './Sayfalar/GirisKayit.jsx'; 
+import AramaSayfasi from './Sayfalar/AramaSayfasi.jsx'; 
+import GezinmeCubugu from './Bilesenler/GezinmeCubugu.jsx'; // Yeni bileşenimiz
+
+function AnaSayfaGoster() {
+    // Burası Sosyal Akış (Feed) sayfası olacak. Şimdilik sadece mesaj gösteriyoruz.
+    return (
+        <div style={{ padding: '20px' }}>
+            <h2>Sosyal Akış (Feed)</h2>
+            <p>Burada takip ettiğiniz kullanıcıların son aktiviteleri (Puanlama, Yorum) listelenecektir.</p>
+        </div>
+    );
+}
+
+function ProfilSayfasiGoster() {
+    // Burası Kütüphanem / Profil sayfası olacak.
+    return (
+        <div style={{ padding: '20px' }}>
+            <h2>Kütüphanem / Profil</h2>
+            <p>Burada İzlediklerim, Okunacaklar ve Özel Listeleriniz yer alacaktır.</p>
+        </div>
+    );
+}
+
 
 function App() {
     const [session, setSession] = useState(null);
+    // Hangi sekmenin aktif olduğunu tutar. Başlangıçta Feed açılır.
+    const [aktifSekme, setAktifSekme] = useState('feed'); 
 
     // Oturum durumunu dinleme mantığı
     useEffect(() => {
-        // Oturum durumunu anında al
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
         });
@@ -19,6 +39,8 @@ function App() {
         const { data: authListener } = supabase.auth.onAuthStateChange(
             (_event, session) => {
                 setSession(session);
+                // Oturum değiştiğinde (örn: giriş yaptığında) ana sayfaya yönlendir
+                if (session) setAktifSekme('feed'); 
             }
         );
 
@@ -33,6 +55,20 @@ function App() {
         await supabase.auth.signOut();
     };
 
+    // Aktif sekmeye göre bileşeni render eden fonksiyon
+    const renderAktifSayfa = () => {
+        switch (aktifSekme) {
+            case 'feed':
+                return <AnaSayfaGoster />;
+            case 'arama':
+                return <AramaSayfasi />;
+            case 'profil':
+                return <ProfilSayfasiGoster />;
+            default:
+                return <AnaSayfaGoster />;
+        }
+    }
+
     return (
         <div className="container" style={{ textAlign: 'center' }}>
             <header>
@@ -43,14 +79,20 @@ function App() {
                 // Oturum yoksa, Giriş/Kayıt ekranını göster
                 <GirisKayit />
             ) : (
-                // Oturum varsa, Hoş Geldiniz Mesajı ve Arama Sayfasını göster
+                // Oturum varsa, Ana Uygulama Layout'unu göster
                 <div>
-                    <h2>Hoş Geldiniz, {session.user.email}!</h2>
-                    <button onClick={handleLogout} style={{ padding: '10px 20px', cursor: 'pointer', marginBottom: '20px' }}>
-                        Çıkış Yap
-                    </button>
+                    <div style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
+                        Hoş Geldiniz, {session.user.email}! 
+                        <button onClick={handleLogout} style={{ marginLeft: '15px', padding: '5px 10px', cursor: 'pointer' }}>
+                            Çıkış Yap
+                        </button>
+                    </div>
                     
-                    <AramaSayfasi /> 
+                    <GezinmeCubugu setActiveTab={setAktifSekme} /> 
+                    
+                    <main>
+                        {renderAktifSayfa()}
+                    </main>
                 </div>
             )}
         </div>

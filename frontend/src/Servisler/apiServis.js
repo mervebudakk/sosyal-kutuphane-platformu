@@ -77,11 +77,73 @@ export const hariciFilmleriAra = async (sorgu) => {
 };
 
 /**
+ * Belirli bir filmin detaylarını çeker, işler ve Supabase'deki Icerikler tablosuna kaydeder.
+ * @param {string} tmdbId - TMDb'deki filmin harici ID'si.
+ * @returns {Promise<object>} Kaydedilen Icerik nesnesi.
+ */
+export const icerigiKaydetVeDetaylariCek = async (tmdbId) => {
+    if (!tmdbId || !TMDB_KEY) {
+        throw new Error("TMDb ID veya API Anahtarı eksik.");
+    }
+    
+    // 1. Detayları ve Oyuncu/Yönetmen (Credits) verilerini tek istekte çekin
+    const url = `${TMDB_URL}/movie/${tmdbId}?api_key=${TMDB_KEY}&language=tr-TR&append_to_response=credits`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Detay çekme başarısız oldu: ${response.status}`);
+        }
+        const data = await response.json();
+        
+        // Veriyi Icerikler tablosu formatına dönüştürün
+        const detayliIcerik = {
+            icerik_turu: 'film',
+            harici_kaynak: 'tmdb',
+            harici_id: tmdbId,
+            baslik: data.title,
+            ozet: data.overview,
+            yayin_yili: data.release_date ? data.release_date.substring(0, 4) : null,
+            sure_sayfa_sayisi: data.runtime, // Film süresi (dakika)
+            kapak_url: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null,
+            
+            // Oyuncu/Yönetmen ve Tür Listelerini Projenizin Formatına Hazırlayın
+            yazar_yonetmen: data.credits.crew
+                .filter(crew => crew.job === 'Director')
+                .map(director => director.name)
+                .join(', '), // Yönetmenleri virgülle ayır
+            
+            turler: data.genres.map(genre => genre.name).join(', ')
+        };
+
+        // 2. Icerikler tablosuna kaydetme veya güncelleme
+        const { data: kaydedilenIcerik, error: dbError } = await supabase
+            .from('Icerikler')
+            .upsert(detayliIcerik, { 
+                onConflict: 'harici_kaynak,harici_id', // Çakışma olursa güncelleme yapar
+                ignoreDuplicates: true 
+            })
+            .select('*')
+            .single();
+
+        if (dbError) {
+            throw new Error(`Veritabanına kaydetme hatası: ${dbError.message}`);
+        }
+
+        return kaydedilenIcerik;
+
+    } catch (error) {
+        console.error("Film Detayı Entegrasyon Hatası:", error);
+        throw error;
+    }
+};
+
+/**
  * Google Books API'den kitap başlığına göre arama yapar (Dilay'ın modülü)
  * Şimdilik boş bırakılmıştır.
  */
 export const hariciKitaplariAra = async (sorgu) => {
-    // Dilay, bu fonksiyonu Google Books API entegrasyonu ile tamamlayacaktır.
-    console.warn("Kitap arama modülü henüz tamamlanmamıştır.");
+    console.warn("Kitap arama modülü henüz tamamlanmamıştır. Sorgu:", sorgu);
+    // Dilay'ın entegrasyonu buraya gelecek.
     return [];
 };
