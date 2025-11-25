@@ -6,6 +6,7 @@ import { supabase } from './Servisler/supabaseServis';
 import GirisKayit from './Sayfalar/GirisKayit.jsx'; 
 import AramaSayfasi from './Sayfalar/AramaSayfasi.jsx'; 
 import IcerikDetaySayfasi from './Sayfalar/IcerikDetaySayfasi.jsx'; // 2. Detay sayfasını ekle
+import ProfilSayfasi from './Sayfalar/ProfilSayfasi.jsx';
 // import GezinmeCubugu from './Bilesenler/GezinmeCubugu.jsx'; // Bunu şimdilik Link ile değiştireceğiz
 
 // --- GÜNCEL ANASAYFA VE PROFIL BİLEŞENLERİ ---
@@ -14,15 +15,6 @@ function AnaSayfaGoster() {
         <div style={{ padding: '20px' }}>
             <h2>Sosyal Akış (Feed)</h2>
             <p>Burada takip ettiğiniz kullanıcıların son aktiviteleri listelenecektir.</p>
-        </div>
-    );
-}
-
-function ProfilSayfasiGoster() {
-    return (
-        <div style={{ padding: '20px' }}>
-            <h2>Kütüphanem / Profil</h2>
-            <p>Burada İzlediklerim, Okunacaklar ve Özel Listeleriniz yer alacaktır.</p>
         </div>
     );
 }
@@ -86,7 +78,7 @@ function App() {
                         <Routes>
                             <Route path="/" element={<AnaSayfaGoster />} />
                             <Route path="/arama" element={<AramaSayfasi />} />
-                            <Route path="/profil" element={<ProfilSayfasiGoster />} />
+                            <Route path="/profil" element={<ProfilSayfasi />} />
                             {/* İŞTE SİHİRLİ SATIR BURASI 👇 */}
                             <Route path="/icerik/:id" element={<IcerikDetaySayfasi />} />
                         </Routes>
