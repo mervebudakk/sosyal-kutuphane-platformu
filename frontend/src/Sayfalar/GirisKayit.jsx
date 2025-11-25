@@ -103,15 +103,12 @@ const GirisKayit = () => {
                 
                 {/* Header */}
                 <div style={{ padding: '40px 30px 20px', textAlign: 'center' }}>
-                    <div style={{ 
-                        width: '70px', height: '70px', 
-                        background: '#F5C518', // IMDb Sarısı
-                        borderRadius: '50%', 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                        margin: '0 auto 20px', 
-                        color: 'black'
-                    }}>
-                        {isSignUp ? <UserPlus size={35} /> : <LogIn size={35} />}
+                    <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <img 
+                        src="/logo.png" 
+                        alt="Sosyal Kütüphane Logo" 
+                        style={{ width: '80px', height: 'auto', filter: 'drop-shadow(0 0 10px rgba(245, 197, 24, 0.3))' }} 
+                    />
                     </div>
                     <h2 style={{ color: 'white', margin: '0 0 10px 0', fontSize: '1.8rem', fontWeight: '700' }}>
                         {isSignUp ? 'Hesap Oluştur' : 'Giriş Yap'}
