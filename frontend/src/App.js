@@ -1,26 +1,27 @@
-// frontend/src/App.js
+// frontend/src/App.js (Son ve Temiz Düzen)
+
 import React, { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient';
-import Auth from './Auth'; // Yeni Auth bileşenimizi import ediyoruz
+// Yeni konumdan servisleri ve sayfaları import edin:
+import { supabase } from './Servisler/supabaseServis';
+import GirisKayit from './Sayfalar/GirisKayit'; // Giriş/Kayıt
+import AramaSayfasi from './Sayfalar/AramaSayfasi'; // Arama Sayfası
 
 function App() {
     const [session, setSession] = useState(null);
 
-    // Oturum durumunu dinleme
+    // Oturum durumunu dinleme mantığı
     useEffect(() => {
         // Oturum durumunu anında al
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
         });
 
-        // Oturum değişikliklerini dinle
         const { data: authListener } = supabase.auth.onAuthStateChange(
             (_event, session) => {
                 setSession(session);
             }
         );
 
-        // Component temizlenirken dinleyiciyi durdur
         return () => {
             if (authListener && authListener.subscription) {
                  authListener.subscription.unsubscribe();
@@ -40,18 +41,16 @@ function App() {
             
             {!session ? (
                 // Oturum yoksa, Giriş/Kayıt ekranını göster
-                <Auth />
+                <GirisKayit />
             ) : (
-                // Oturum varsa, Ana Sayfa içeriğini göster
-                <div style={{ marginTop: '50px' }}>
+                // Oturum varsa, Hoş Geldiniz Mesajı ve Arama Sayfasını göster
+                <div>
                     <h2>Hoş Geldiniz, {session.user.email}!</h2>
-                    <p>Bu, Sosyal Akış ve Ana Sayfanızdır.</p>
-                    <button onClick={handleLogout} style={{ padding: '10px 20px', cursor: 'pointer' }}>
+                    <button onClick={handleLogout} style={{ padding: '10px 20px', cursor: 'pointer', marginBottom: '20px' }}>
                         Çıkış Yap
                     </button>
                     
-                    {/* Devam etmeden önce Kullanicilar tablosuna kayıt yapmalıyız. */}
-                    {/* Bu kısım için Use Case'e geçebiliriz. */}
+                    <AramaSayfasi /> 
                 </div>
             )}
         </div>

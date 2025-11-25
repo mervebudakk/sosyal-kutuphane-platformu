@@ -1,9 +1,9 @@
-// frontend/src/Auth.js
 import React, { useState } from 'react';
-import { supabase } from './supabaseClient'; // Supabase bağlantımız
+// Yeni konumdan Supabase bağlantımızı import ediyoruz
+import { supabase } from '../Servisler/supabaseServis'; 
 
 // Kullanıcının kayıt/giriş işlemlerini yönetecek bileşen
-const Auth = () => {
+const GirisKayit = () => { // Bileşen Adı Düzeltildi
     const [isSignUp, setIsSignUp] = useState(false); // Kayıt mı, Giriş mi?
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
@@ -36,7 +36,7 @@ const Auth = () => {
         setError('');
         setMessage('');
 
-        // 1. Supabase Auth üzerinden kullanıcı kaydı
+        // 1. Supabase Auth üzerinden kullanıcı kaydı (Authentication)
         const { data, error: authError } = await supabase.auth.signUp({
             email,
             password,
@@ -51,7 +51,8 @@ const Auth = () => {
             // Auth hatası varsa (örn: şifre çok kısa, e-posta formatı hatalı)
             setError(authError.message);
         } else if (data.user) {
-            // 2. Auth kaydı başarılı: Şimdi Kullanicilar tablosuna manuel kayıt ekle
+            // 2. Auth kaydı başarılı: Şimdi Kullanicilar tablosuna manuel kayıt ekle (Database)
+            // Bu, sizin daha önce trigger'ı devre dışı bırakarak çözdüğünüz manuel kayıttır.
             const { error: dbError } = await supabase
                 .from('Kullanicilar')
                 .insert({
@@ -64,8 +65,7 @@ const Auth = () => {
                 // Veritabanı (Kullanicilar) tablosuna kayıt hatası varsa
                 setError(`Veritabanı Kayıt Hatası: ${dbError.message}. Bu kullanıcı adı veya e-posta zaten kullanımda olabilir.`);
                 
-                // Opsiyonel: Eğer dbError alırsak, Supabase Auth'tan bu kullanıcıyı silebiliriz.
-                // await supabase.auth.admin.deleteUser(data.user.id);
+                // NOT: Gerçek bir uygulamada, Auth'tan eklenen kullanıcıyı silmek için Sunucu fonksiyonu (Edge Function) gerekir.
             } else {
                 // Her iki kayıt da başarılıysa
                 setMessage('Kayıt başarılı! E-posta adresinizi kontrol edin ve hesabınızı onaylayın.');
@@ -173,4 +173,4 @@ const Auth = () => {
     );
 };
 
-export default Auth;
+export default GirisKayit; 
