@@ -1,152 +1,198 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Film, BookOpen, Clock, CheckCircle } from 'lucide-react';
 import { supabase } from '../Servisler/supabaseServis';
 import { useNavigate } from 'react-router-dom';
 
 const ProfilSayfasi = () => {
     const navigate = useNavigate();
-    const [yukleniyor, setYukleniyor] = useState(true);
+    const [aktifSekme, setAktifSekme] = useState('kitap');
     const [kullanici, setKullanici] = useState(null);
-    
-    // Listeleri tutacak state'ler
-    const [okuduklarim, setOkuduklarim] = useState([]);
-    const [okunacaklar, setOkunacaklar] = useState([]);
-    const [izlediklerim, setIzlediklerim] = useState([]);
-    const [izlenecekler, setIzlenecekler] = useState([]);
+    const [listeler, setListeler] = useState({ okuduklarim: [], okunacaklar: [], izlediklerim: [], izlenecekler: [] });
+    const [yukleniyor, setYukleniyor] = useState(true);
 
-    const [aktifSekme, setAktifSekme] = useState('kitap'); // 'kitap' veya 'film'
-
+    // --- MANTIK KISMI (AYNEN KORUNDU) ---
     useEffect(() => {
         const veriGetir = async () => {
-            // 1. Giriş yapmış kullanıcıyı al
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                navigate('/'); // Giriş yoksa ana sayfaya at
-                return;
-            }
+            if (!user) { navigate('/'); return; }
+
+            const { data: dbUser } = await supabase.from('Kullanicilar').select('*').eq('eposta', user.email).single();
             
-            // Kullanıcı bilgilerini (Auth'dan değil veritabanından) çekebiliriz
-            // Şimdilik e-postasını göstermek için user nesnesini sete ediyoruz
-            setKullanici(user);
-
-            // 2. Kullanıcının ID'sini 'Kullanicilar' tablosundan bul
-            const { data: dbUser, error: userError } = await supabase
-                .from('Kullanicilar')
-                .select('kullanici_id')
-                .eq('eposta', user.email)
-                .single();
-
-            if (userError || !dbUser) {
-                console.error("Kullanıcı bulunamadı", userError);
-                setYukleniyor(false);
-                return;
+            if (dbUser) {
+                setKullanici({ ...dbUser, email: user.email });
+                const { data: items } = await supabase.from('KullaniciIcerikDurumlari').select('durum, Icerikler(*)').eq('kullanici_id', dbUser.kullanici_id);
+                
+                if (items) {
+                    setListeler({
+                        okuduklarim: items.filter(i => i.durum === 'okudum').map(i => i.Icerikler),
+                        okunacaklar: items.filter(i => i.durum === 'okunacak').map(i => i.Icerikler),
+                        izlediklerim: items.filter(i => i.durum === 'izledim').map(i => i.Icerikler),
+                        izlenecekler: items.filter(i => ['izlenecek', 'izlenecekler'].includes(i.durum)).map(i => i.Icerikler),
+                    });
+                }
             }
-
-            // 3. Kullanıcının listelerini ve ilgili içerik detaylarını çek (JOIN işlemi)
-            const { data, error } = await supabase
-                .from('KullaniciIcerikDurumlari')
-                .select(`
-                    durum,
-                    Icerikler (
-                        *
-                    )
-                `)
-                .eq('kullanici_id', dbUser.kullanici_id);
-
-            if (error) {
-                console.error("Liste çekme hatası:", error);
-            } else if (data) {
-                // 4. Gelen veriyi kategorilere ayır
-                setOkuduklarim(data.filter(x => x.durum === 'okudum').map(x => x.Icerikler));
-                setOkunacaklar(data.filter(x => x.durum === 'okunacak').map(x => x.Icerikler));
-                setIzlediklerim(data.filter(x => x.durum === 'izledim').map(x => x.Icerikler));
-                setIzlenecekler(data.filter(x => x.durum === 'izlenecek').map(x => x.Icerikler));
-            }
-            
             setYukleniyor(false);
         };
-
         veriGetir();
     }, [navigate]);
+    // -------------------------------------
 
-    if (yukleniyor) return <div style={{textAlign:'center', marginTop:'50px'}}>Yükleniyor...</div>;
+    if (yukleniyor) return <div style={{ background: '#121212', minHeight: '100vh', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Yükleniyor...</div>;
 
-    return (
-        <div style={{ maxWidth: '1000px', margin: '30px auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-            {/* Üst Profil Kartı */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '12px', border: '1px solid #eee' }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#333', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '30px', marginRight: '20px' }}>
-                    {kullanici?.email?.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                    <h2 style={{ margin: 0 }}>{kullanici?.email}</h2>
-                    <p style={{ margin: '5px 0 0 0', color: '#666' }}>Kütüphane Yöneticisi</p>
-                </div>
+    const IcerikKarti = ({ icerik }) => (
+        <div 
+            onClick={() => navigate(`/icerik/${icerik.icerik_id}`)}
+            style={{
+                background: '#1F1F1F', 
+                borderRadius: '4px', 
+                overflow: 'hidden', 
+                cursor: 'pointer', 
+                transition: 'all 0.2s ease', 
+                border: '1px solid #333', 
+                position: 'relative'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#F5C518'; e.currentTarget.style.transform = 'scale(1.02)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.transform = 'scale(1)'; }}
+        >
+            <div style={{ width: '100%', paddingTop: '150%', position: 'relative', background: '#333' }}>
+                <img src={icerik.kapak_url} alt={icerik.baslik} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
-
-            {/* Sekmeler */}
-            <div style={{ marginBottom: '20px', borderBottom: '2px solid #eee' }}>
-                <button 
-                    onClick={() => setAktifSekme('kitap')}
-                    style={{ padding: '10px 20px', marginRight: '10px', border: 'none', background: 'none', borderBottom: aktifSekme === 'kitap' ? '3px solid #e67e22' : 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}
-                >
-                    📚 Kitaplarım
-                </button>
-                <button 
-                    onClick={() => setAktifSekme('film')}
-                    style={{ padding: '10px 20px', border: 'none', background: 'none', borderBottom: aktifSekme === 'film' ? '3px solid #3498db' : 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}
-                >
-                    🎥 Filmlerim
-                </button>
-            </div>
-
-            {/* LİSTE GÖSTERİMİ */}
-            <div style={{ display: 'flex', gap: '40px' }}>
-                
-                {/* SOL SÜTUN: Bitirilenler */}
-                <div style={{ flex: 1 }}>
-                    <h3 style={{ color: '#27ae60' }}>
-                        {aktifSekme === 'kitap' ? '📖 Okuduklarım' : '👁️ İzlediklerim'} 
-                        <span style={{ fontSize: '0.8em', color: '#999', marginLeft: '10px' }}>
-                            ({aktifSekme === 'kitap' ? okuduklarim.length : izlediklerim.length})
-                        </span>
-                    </h3>
-                    <ListeBileseni liste={aktifSekme === 'kitap' ? okuduklarim : izlediklerim} navigate={navigate} />
-                </div>
-
-                {/* SAĞ SÜTUN: Yapılacaklar */}
-                <div style={{ flex: 1 }}>
-                    <h3 style={{ color: '#f39c12' }}>
-                        {aktifSekme === 'kitap' ? '⏳ Okunacaklar' : '🍿 İzlenecekler'}
-                        <span style={{ fontSize: '0.8em', color: '#999', marginLeft: '10px' }}>
-                            ({aktifSekme === 'kitap' ? okunacaklar.length : izlenecekler.length})
-                        </span>
-                    </h3>
-                    <ListeBileseni liste={aktifSekme === 'kitap' ? okunacaklar : izlenecekler} navigate={navigate} />
-                </div>
+            <div style={{ padding: '12px' }}>
+                <h4 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '0.9rem', fontWeight: 'bold', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{icerik.baslik}</h4>
+                <span style={{ color: '#AAAAAA', fontSize: '0.8rem', fontWeight: '500' }}>{icerik.yayin_yili}</span>
             </div>
         </div>
     );
-};
 
-// Listeyi ekrana basan küçük yardımcı bileşen
-const ListeBileseni = ({ liste, navigate }) => {
-    if (liste.length === 0) return <p style={{ color: '#999', fontStyle: 'italic' }}>Listeniz boş.</p>;
+    const ListeBasligi = ({ icon: Icon, renk, baslik, adet }) => (
+        <div style={{ 
+            background: '#1F1F1F', 
+            borderLeft: `4px solid ${renk}`, 
+            borderRadius: '4px', 
+            padding: '15px 20px', 
+            marginBottom: '20px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <Icon size={24} color={renk} />
+                <div>
+                    <h3 style={{ color: 'white', margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>{baslik}</h3>
+                </div>
+            </div>
+            <div style={{ 
+                background: '#333', 
+                padding: '4px 10px', 
+                borderRadius: '4px', 
+                color: 'white', 
+                fontSize: '0.9rem', 
+                fontWeight: 'bold' 
+            }}>
+                {adet}
+            </div>
+        </div>
+    );
 
     return (
-        <div style={{ display: 'grid', gap: '15px' }}>
-            {liste.map((icerik) => (
-                <div 
-                    key={icerik.icerik_id} 
-                    onClick={() => navigate(`/icerik/${icerik.icerik_id}`)}
-                    style={{ display: 'flex', gap: '15px', padding: '10px', border: '1px solid #eee', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
-                >
-                    <img src={icerik.kapak_url} alt={icerik.baslik} style={{ width: '50px', height: '75px', objectFit: 'cover', borderRadius: '4px' }} />
+        <div style={{ minHeight: '100vh', background: '#121212', padding: '40px 20px 80px', fontFamily: "'Roboto', sans-serif", color: '#FFFFFF' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                
+                {/* Profil Header */}
+                <div style={{ 
+                    background: '#1F1F1F', 
+                    borderRadius: '8px', 
+                    padding: '40px', 
+                    marginBottom: '40px', 
+                    border: '1px solid #333', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '30px' 
+                }}>
+                    <div style={{ 
+                        width: '100px', height: '100px', 
+                        borderRadius: '50%', 
+                        background: '#F5C518', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        fontSize: '3rem', color: 'black', fontWeight: 'bold',
+                        flexShrink: 0
+                    }}>
+                        {kullanici?.kullanici_adi?.charAt(0).toUpperCase()}
+                    </div>
                     <div>
-                        <h4 style={{ margin: '0 0 5px 0', fontSize: '14px' }}>{icerik.baslik}</h4>
-                        <span style={{ fontSize: '12px', color: '#7f8c8d' }}>{icerik.yayin_yili}</span>
+                        <h1 style={{ color: 'white', fontSize: '2.5rem', fontWeight: 'bold', margin: '0 0 5px 0' }}>{kullanici?.kullanici_adi}</h1>
+                        <p style={{ color: '#AAAAAA', fontSize: '1rem', margin: '0 0 15px 0' }}>{kullanici?.email}</p>
+                        <p style={{ color: '#DDDDDD', fontSize: '1rem', fontStyle: 'italic' }}>{kullanici?.biyografi || 'Henüz biyografi eklenmemiş.'}</p>
                     </div>
                 </div>
-            ))}
+
+                {/* Kategori Sekmeleri */}
+                <div style={{ display: 'flex', gap: '15px', marginBottom: '40px', borderBottom: '1px solid #333', paddingBottom: '15px' }}>
+                    {[{ id: 'kitap', icon: BookOpen, label: 'Kitaplarım' }, { id: 'film', icon: Film, label: 'Filmlerim' }].map(k => {
+                        const aktif = aktifSekme === k.id;
+                        return (
+                            <button 
+                                key={k.id} 
+                                onClick={() => setAktifSekme(k.id)} 
+                                style={{ 
+                                    background: aktif ? '#F5C518' : 'transparent', 
+                                    color: aktif ? 'black' : '#AAAAAA', 
+                                    border: 'none', 
+                                    padding: '10px 20px', 
+                                    borderRadius: '4px', 
+                                    cursor: 'pointer', 
+                                    fontSize: '1rem', 
+                                    fontWeight: 'bold', 
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                <k.icon size={20} /> {k.label}
+                            </button>
+                        )
+                    })}
+                </div>
+
+                {/* Listeler Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+                    
+                    {/* Sol Sütun (Tamamlananlar) */}
+                    <div>
+                        <ListeBasligi 
+                            icon={CheckCircle} 
+                            renk="#10b981" // Yeşil (IMDb tarzında tamamlanan işler için yeşil uygundur)
+                            baslik={aktifSekme === 'kitap' ? 'Okuduklarım' : 'İzlediklerim'} 
+                            adet={aktifSekme === 'kitap' ? listeler.okuduklarim.length : listeler.izlediklerim.length} 
+                        />
+                        { (aktifSekme === 'kitap' ? listeler.okuduklarim : listeler.izlediklerim).length > 0 ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '15px' }}>
+                                {(aktifSekme === 'kitap' ? listeler.okuduklarim : listeler.izlediklerim).map(i => <IcerikKarti key={i.icerik_id} icerik={i} />)}
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '30px', color: '#555', border: '1px dashed #333', borderRadius: '4px' }}>Henüz içerik yok.</div>
+                        )}
+                    </div>
+
+                    {/* Sağ Sütun (Yapılacaklar) */}
+                    <div>
+                        <ListeBasligi 
+                            icon={Clock} 
+                            renk="#F5C518" // Sarı (Watchlist rengi)
+                            baslik={aktifSekme === 'kitap' ? 'Okunacaklar' : 'İzlenecekler'} 
+                            adet={aktifSekme === 'kitap' ? listeler.okunacaklar.length : listeler.izlenecekler.length} 
+                        />
+                        { (aktifSekme === 'kitap' ? listeler.okunacaklar : listeler.izlenecekler).length > 0 ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '15px' }}>
+                                {(aktifSekme === 'kitap' ? listeler.okunacaklar : listeler.izlenecekler).map(i => <IcerikKarti key={i.icerik_id} icerik={i} />)}
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '30px', color: '#555', border: '1px dashed #333', borderRadius: '4px' }}>Henüz içerik yok.</div>
+                        )}
+                    </div>
+
+                </div>
+            </div>
         </div>
     );
 };

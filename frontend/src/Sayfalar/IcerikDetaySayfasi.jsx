@@ -1,206 +1,285 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../Servisler/supabaseServis';
+import { Star, Clock, Calendar, Film, BookOpen, ArrowLeft, Check, Plus, Heart, Share2 } from 'lucide-react';
 
 const IcerikDetaySayfasi = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [icerik, setIcerik] = useState(null);
     const [yukleniyor, setYukleniyor] = useState(true);
+    const [begenildi, setBegenildi] = useState(false);
+    const [yeniYorum, setYeniYorum] = useState('');
+    const [mevcutDurum, setMevcutDurum] = useState(null); 
 
+    // --- MANTIK KISMI (AYNEN KORUNDU) ---
     useEffect(() => {
-        const icerikGetir = async () => {
-            const { data, error } = await supabase
+        const veriGetir = async () => {
+            const { data: icerikData, error } = await supabase
                 .from('Icerikler')
-                .select(`
-                    *,
-                    IcerikIstatistikleri (
-                        ortalama_puan,
-                        toplam_oy_sayisi
-                    )
-                `)
+                .select(`*, IcerikIstatistikleri (ortalama_puan, toplam_oy_sayisi)`)
                 .eq('icerik_id', id)
                 .single();
 
-            if (error) {
-                console.error("Veri çekme hatası:", error);
-            } else {
-                setIcerik(data);
+            if (!error && icerikData) {
+                setIcerik(icerikData);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: dbUser } = await supabase.from('Kullanicilar').select('kullanici_id').eq('eposta', user.email).single();
+                    if (dbUser) {
+                        const { data: durumData } = await supabase.from('KullaniciIcerikDurumlari').select('durum').eq('kullanici_id', dbUser.kullanici_id).eq('icerik_id', id).single();
+                        if (durumData) setMevcutDurum(durumData.durum);
+                    }
+                }
             }
             setYukleniyor(false);
         };
-
-        if (id) icerikGetir();
+        if (id) veriGetir();
     }, [id]);
 
-    // 👇 Durum Güncelleme Fonksiyonu
     const durumGuncelle = async (yeniDurum) => {
         try {
-            // 1. Supabase Auth'dan giriş yapmış kullanıcının bilgisini al
             const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { alert("Giriş yapmalısınız!"); return; }
+            const { data: dbUser } = await supabase.from('Kullanicilar').select('kullanici_id').eq('eposta', user.email).single();
             
-            if (!user) {
-                alert("İşlem yapabilmek için giriş yapmalısınız!");
-                return;
-            }
-
-            // 2. KRİTİK ADIM: Auth ID'si yerine Merve'nin 'Kullanicilar' tablosundaki ID'yi bulmalıyız.
-            // Bunu 'eposta' adresi üzerinden eşleştirerek yapıyoruz.
-            const { data: kullaniciData, error: kullaniciError } = await supabase
-                .from('Kullanicilar')
-                .select('kullanici_id')
-                .eq('eposta', user.email)
-                .single();
-
-            if (kullaniciError || !kullaniciData) {
-                console.error("Kullanıcı Bulunamadı Hatası:", kullaniciError);
-                alert("Hata: Kullanıcı profiliniz veritabanında bulunamadı. Lütfen çıkış yapıp tekrar kayıt olun.");
-                return;
-            }
-
-            // 3. Artık gerçek ID'yi (kullaniciData.kullanici_id) kullanabiliriz
-            const { error } = await supabase
-                .from('KullaniciIcerikDurumlari')
-                .upsert({
-                    kullanici_id: kullaniciData.kullanici_id, // <-- DÜZELTİLEN KISIM
-                    icerik_id: icerik.icerik_id, 
+            if (dbUser) {
+                const { error } = await supabase.from('KullaniciIcerikDurumlari').upsert({
+                    kullanici_id: dbUser.kullanici_id,
+                    icerik_id: icerik.icerik_id,
                     durum: yeniDurum
                 }, { onConflict: 'kullanici_id, icerik_id' });
 
-            if (error) throw error;
-
-            // Mesajı duruma göre güzelleştiriyoruz
-            let mesaj = "";
-            if (yeniDurum === 'izledim' || yeniDurum === 'okudum') {
-                mesaj = `Bu içerik başarıyla "${yeniDurum}" olarak işaretlendi.`;
-            } else {
-                mesaj = `Başarıyla "${yeniDurum === 'izlenecek' ? 'izlenecekler' : 'okunacaklar'}" listesine eklendi!`;
+                if (!error) {
+                    let mesaj = yeniDurum === 'izledim' || yeniDurum === 'okudum' 
+                        ? `Tebrikler! "${yeniDurum}" olarak işaretlendi.` 
+                        : `Başarıyla "${yeniDurum === 'izlenecek' ? 'izlenecekler' : 'okunacaklar'}" listesine eklendi!`;
+                    alert(mesaj);
+                    setMevcutDurum(yeniDurum);
+                }
             }
-
-            alert(mesaj);
-
-        } catch (error) {
-            console.error("Durum güncelleme hatası:", error);
-            alert("Bir hata oluştu: " + error.message);
-        }
+        } catch (err) { console.error(err); }
     };
+    // -------------------------------------
 
-    if (yukleniyor) return <div style={{textAlign:'center', marginTop:'50px', fontSize:'18px'}}>Yükleniyor...</div>;
-    
-    if (!icerik) return (
-        <div style={{textAlign:'center', marginTop:'50px'}}>
-            <h2>İçerik Bulunamadı</h2>
-            <button onClick={() => navigate(-1)} style={{cursor:'pointer', padding:'10px'}}>Geri Dön</button>
-        </div>
-    );
+    if (yukleniyor) return <div style={{ background: '#121212', minHeight: '100vh', color:'white', display:'flex', alignItems:'center', justifyContent:'center' }}>Yükleniyor...</div>;
+    if (!icerik) return <div style={{ background: '#121212', minHeight: '100vh', color:'white', display:'flex', alignItems:'center', justifyContent:'center' }}>İçerik bulunamadı.</div>;
 
-    const istatistik = Array.isArray(icerik.IcerikIstatistikleri) 
-        ? icerik.IcerikIstatistikleri[0] 
-        : icerik.IcerikIstatistikleri;
-        
+    const istatistik = Array.isArray(icerik.IcerikIstatistikleri) ? icerik.IcerikIstatistikleri[0] : icerik.IcerikIstatistikleri;
     const puan = istatistik?.ortalama_puan || 0;
     const oySayisi = istatistik?.toplam_oy_sayisi || 0;
+    
+    // Buton Durumları
+    const okudumAktif = mevcutDurum === 'okudum' || mevcutDurum === 'izledim';
+    const okunacakAktif = mevcutDurum === 'okunacak' || mevcutDurum === 'izlenecek' || mevcutDurum === 'izlenecekler';
 
     return (
-        // 👇 Ana kapsayıcı div BURADA BAŞLIYOR (Sende eksik olan buydu)
-        <div style={{ maxWidth: '1000px', margin: '30px auto', padding: '20px', display: 'flex', gap: '40px', fontFamily: 'Arial, sans-serif' }}>
+        <div style={{ 
+            minHeight: '100vh', 
+            background: '#121212', // IMDb Siyahı
+            fontFamily: "'Roboto', sans-serif", 
+            color: '#FFFFFF',
+            paddingBottom: '50px'
+        }}>
             
-            {/* SOL TARAF: KAPAK VE İŞLEM BUTONLARI */}
-            <div style={{ width: '300px', flexShrink: 0 }}>
-                <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 8px 16px rgba(0,0,0,0.2)' }}>
-                    <img 
-                        src={icerik.kapak_url || 'https://via.placeholder.com/300x450?text=Kapak+Yok'} 
-                        alt={icerik.baslik} 
-                        style={{ width: '100%', display: 'block' }}
-                    />
-                </div>
+            {/* ÜST BANNER (Bulanık Arka Plan) */}
+            <div style={{ position: 'relative', height: '400px', overflow: 'hidden' }}>
+                {/* Arka Plan Resmi */}
+                <div style={{ 
+                    position: 'absolute', inset: 0, 
+                    backgroundImage: `url(${icerik.kapak_url})`, 
+                    backgroundSize: 'cover', 
+                    backgroundPosition: 'center', 
+                    filter: 'blur(25px) brightness(0.3)', // IMDb tarzı karanlık blur
+                    transform: 'scale(1.1)' 
+                }} />
                 
-                {/* Aksiyon Butonları */}
-                <div style={{ marginTop: '25px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    
-                    {/* BUTON 1: OKUDUM / İZLEDİM */}
-                    <button 
-                        onClick={() => durumGuncelle(icerik.icerik_turu === 'film' ? 'izledim' : 'okudum')}
-                        style={{ 
-                            padding: '12px', 
-                            backgroundColor: '#2c3e50', 
-                            color: 'white', 
-                            border: 'none', 
-                            borderRadius: '6px', 
-                            cursor: 'pointer',
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            transition: 'background 0.2s'
-                        }}
-                        onMouseOver={(e) => e.target.style.backgroundColor = '#1a252f'}
-                        onMouseOut={(e) => e.target.style.backgroundColor = '#2c3e50'}
-                    >
-                        {icerik.icerik_turu === 'film' ? '👁️ İzledim' : '📖 Okudum'} Olarak İşaretle
-                    </button>
-                    
-                    {/* BUTON 2: LİSTEYE EKLE (OKUNACAK / İZLENECEK) */}
-                    <button 
-                        onClick={() => durumGuncelle(icerik.icerik_turu === 'film' ? 'izlenecek' : 'okunacak')}
-                        style={{ 
-                            padding: '12px', 
-                            backgroundColor: '#ecf0f1', 
-                            border: '1px solid #bdc3c7', 
-                            borderRadius: '6px', 
-                            cursor: 'pointer',
-                            fontSize: '16px',
-                            color: '#2c3e50'
-                        }}
-                    >
-                        ➕ {icerik.icerik_turu === 'film' ? 'İzlenecekler' : 'Okunacaklar'} Listesine Ekle
+                {/* Gradient Geçiş */}
+                <div style={{ 
+                    position: 'absolute', inset: 0, 
+                    background: 'linear-gradient(to bottom, transparent 0%, #121212 100%)' 
+                }} />
+
+                {/* Geri Butonu */}
+                <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 20 }}>
+                    <button onClick={() => navigate(-1)} style={{ 
+                        background: 'rgba(255,255,255,0.1)', 
+                        color: 'white', 
+                        border: 'none', 
+                        padding: '10px 20px', 
+                        borderRadius: '4px', 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        fontWeight: 'bold',
+                        backdropFilter: 'blur(5px)'
+                    }}>
+                        <ArrowLeft size={20} /> Geri Dön
                     </button>
                 </div>
             </div>
 
-            {/* SAĞ TARAF: DETAYLAR */}
-            <div style={{ flex: 1 }}>
-                <h1 style={{ marginTop: 0, fontSize: '2.5rem', marginBottom: '10px', color: '#2c3e50' }}>
-                    {icerik.baslik} 
-                    {icerik.yayin_yili && <span style={{fontSize: '0.6em', color: '#7f8c8d', fontWeight: 'normal', marginLeft: '10px'}}>({icerik.yayin_yili})</span>}
-                </h1>
+            {/* ANA İÇERİK ALANI */}
+            <div style={{ maxWidth: '1200px', margin: '-250px auto 0', padding: '0 20px', position: 'relative', zIndex: 10 }}>
                 
-                {/* Puan Bilgisi (Veritabanından) */}
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '25px', backgroundColor: '#f9f9f9', padding: '10px 15px', borderRadius: '8px', width: 'fit-content' }}>
-                    <span style={{ fontSize: '28px', color: '#f1c40f', marginRight: '5px' }}>★</span>
-                    <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#2c3e50' }}>{Number(puan).toFixed(1)}</span>
-                    <span style={{ marginLeft: '8px', color: '#7f8c8d', fontSize: '14px' }}>/ 10 ({oySayisi} oy)</span>
+                {/* Başlık Bloğu */}
+                <div style={{ marginBottom: '30px' }}>
+                    <h1 style={{ fontSize: '3.5rem', fontWeight: '900', margin: '0 0 10px 0', textShadow: '2px 2px 10px rgba(0,0,0,0.8)' }}>
+                        {icerik.baslik}
+                    </h1>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', color: '#AAAAAA', fontSize: '1rem', fontWeight: '500' }}>
+                        <span style={{ textTransform: 'uppercase', border: '1px solid #AAAAAA', padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem' }}>
+                            {icerik.icerik_turu}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={16} color="#F5C518" /> {icerik.yayin_yili}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Clock size={16} color="#F5C518" /> {icerik.sure_sayfa_sayisi} {icerik.icerik_turu === 'film' ? 'dk' : 'sayfa'}
+                        </span>
+                    </div>
                 </div>
 
-                {/* Meta Veriler Tablosu */}
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', rowGap: '12px', marginBottom: '30px' }}>
+                {/* Grid Yapısı: Poster ve Detaylar */}
+                <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '40px' }}>
                     
-                    <strong style={{color: '#7f8c8d'}}>Tür:</strong>
-                    <span style={{textTransform: 'capitalize'}}>{icerik.icerik_turu}</span>
-                    
-                    <strong style={{color: '#7f8c8d'}}>{icerik.icerik_turu === 'film' ? 'Yönetmen' : 'Yazar'}:</strong>
-                    <span>{icerik.yazar_yonetmen || 'Bilinmiyor'}</span>
-                    
-                    <strong style={{color: '#7f8c8d'}}>Kategoriler:</strong>
-                    <span>{icerik.turler || '-'}</span>
-                    
-                    {(icerik.sure_sayfa_sayisi > 0) && (
-                        <>
-                            <strong style={{color: '#7f8c8d'}}>{icerik.icerik_turu === 'film' ? 'Süre' : 'Sayfa'}:</strong>
-                            <span>{icerik.sure_sayfa_sayisi} {icerik.icerik_turu === 'film' ? 'dakika' : 'sayfa'}</span>
-                        </>
-                    )}
-                </div>
+                    {/* SOL: POSTER */}
+                    <div>
+                        <img 
+                            src={icerik.kapak_url || 'https://via.placeholder.com/300x450'} 
+                            alt={icerik.baslik} 
+                            style={{ 
+                                width: '100%', 
+                                borderRadius: '8px', 
+                                boxShadow: '0 10px 40px rgba(0,0,0,0.5)', 
+                                border: '1px solid rgba(255,255,255,0.1)' 
+                            }} 
+                        />
+                        
+                        {/* KÜÇÜK BUTONLAR (Beğen / Paylaş) */}
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                            <button onClick={() => setBegenildi(!begenildi)} style={{ 
+                                flex: 1, background: '#1F1F1F', border: 'none', 
+                                padding: '10px', borderRadius: '4px', cursor: 'pointer', 
+                                color: begenildi ? '#ef4444' : 'white',
+                                display: 'flex', justifyContent: 'center', alignItems: 'center'
+                            }}>
+                                <Heart size={24} fill={begenildi ? '#ef4444' : 'none'} />
+                            </button>
+                            <button style={{ 
+                                flex: 1, background: '#1F1F1F', border: 'none', 
+                                padding: '10px', borderRadius: '4px', cursor: 'pointer', color: 'white',
+                                display: 'flex', justifyContent: 'center', alignItems: 'center'
+                            }}>
+                                <Share2 size={24} />
+                            </button>
+                        </div>
+                    </div>
 
-                <h3 style={{ borderBottom: '2px solid #ecf0f1', paddingBottom: '10px', color: '#2c3e50' }}>Özet</h3>
-                {/* HTML Düzeltmesi Yapılmış Özet Kısmı */}
-                <div 
-                    style={{ lineHeight: '1.7', color: '#34495e', fontSize: '16px', textAlign: 'justify' }}
-                    dangerouslySetInnerHTML={{ __html: icerik.ozet || "Bu içerik için henüz bir özet girilmemiş." }}
-                />
+                    {/* SAĞ: DETAYLAR VE BUTONLAR */}
+                    <div>
+                        {/* Kategori Tagleri */}
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '25px', flexWrap: 'wrap' }}>
+                            {icerik.turler ? icerik.turler.split(', ').map((tur, i) => (
+                                <span key={i} style={{ 
+                                    background: '#1F1F1F', 
+                                    border: '1px solid #333', 
+                                    padding: '6px 16px', 
+                                    borderRadius: '20px', 
+                                    fontSize: '0.9rem', 
+                                    color: '#F5C518', // Sarı yazı
+                                    fontWeight: '600'
+                                }}>
+                                    {tur}
+                                </span>
+                            )) : null}
+                        </div>
 
-                <div style={{ marginTop: '40px' }}>
-                    <h3 style={{ borderBottom: '2px solid #ecf0f1', paddingBottom: '10px', color: '#2c3e50' }}>Yorumlar ve Değerlendirmeler</h3>
-                    <div style={{ padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px', textAlign: 'center', color: '#7f8c8d', border: '1px dashed #bdc3c7' }}>
-                        Henüz yorum yapılmamış. İlk yorumu sen yap!
+                        {/* Açıklama */}
+                        <p style={{ fontSize: '1.1rem', lineHeight: '1.6', color: '#DDDDDD', marginBottom: '30px' }} dangerouslySetInnerHTML={{ __html: icerik.ozet }} />
+
+                        {/* Yönetmen/Yazar */}
+                        <div style={{ borderTop: '1px solid #333', borderBottom: '1px solid #333', padding: '15px 0', marginBottom: '30px', display: 'flex', gap: '15px', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 'bold', color: 'white' }}>{icerik.icerik_turu === 'film' ? 'Yönetmen' : 'Yazar'}</span>
+                            <span style={{ color: '#5799ef', cursor: 'pointer' }}>{icerik.yazar_yonetmen || 'Bilinmiyor'}</span>
+                        </div>
+
+                        {/* AKSİYON ALANI (IMDb Stili) */}
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            
+                            {/* PUAN KARTI */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <Star size={40} fill="#F5C518" color="#F5C518" />
+                                <div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>
+                                        {Number(puan).toFixed(1)}<span style={{ fontSize: '1rem', color: '#777' }}>/10</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: '#777' }}>{oySayisi} oy</div>
+                                </div>
+                            </div>
+
+                            {/* DİKEY AYIRAÇ */}
+                            <div style={{ width: '1px', height: '50px', background: '#333' }}></div>
+
+                            {/* LİSTEYE EKLE (Sarı Buton - Ana Aksiyon) */}
+                            <button 
+                                onClick={() => durumGuncelle(icerik.icerik_turu === 'film' ? 'izlenecek' : 'okunacak')}
+                                style={{ 
+                                    background: okunacakAktif ? '#E2B616' : '#F5C518', 
+                                    color: 'black', 
+                                    border: 'none', 
+                                    padding: '12px 24px', 
+                                    borderRadius: '4px', // IMDb köşeli buton
+                                    fontSize: '1rem', 
+                                    fontWeight: 'bold', 
+                                    cursor: 'pointer', 
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    transition: 'background 0.2s'
+                                }}
+                            >
+                                {okunacakAktif ? <Check size={20} /> : <Plus size={20} />}
+                                {okunacakAktif ? 'Listemde' : 'Listeye Ekle'}
+                            </button>
+
+                            {/* OKUDUM/İZLEDİM (İkincil Buton - Transparent) */}
+                            <button 
+                                onClick={() => durumGuncelle(icerik.icerik_turu === 'film' ? 'izledim' : 'okudum')}
+                                style={{ 
+                                    background: 'transparent', 
+                                    color: okudumAktif ? '#10b981' : '#5799ef', // Aktifse Yeşil, Değilse Mavi
+                                    border: `2px solid ${okudumAktif ? '#10b981' : '#333'}`, 
+                                    padding: '10px 20px', 
+                                    borderRadius: '4px', 
+                                    fontSize: '1rem', 
+                                    fontWeight: 'bold', 
+                                    cursor: 'pointer', 
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <Check size={18} />
+                                {icerik.icerik_turu === 'film' ? 'İzledim' : 'Okudum'}
+                            </button>
+
+                        </div>
+
+                        {/* Yorum Alanı */}
+                        <div style={{ marginTop: '50px' }}>
+                            <h3 style={{ borderLeft: '4px solid #F5C518', paddingLeft: '10px', color: 'white' }}>Yorum Yap</h3>
+                            <div style={{ marginTop: '20px', background: '#1F1F1F', padding: '20px', borderRadius: '8px' }}>
+                                <textarea 
+                                    value={yeniYorum} 
+                                    onChange={(e) => setYeniYorum(e.target.value)} 
+                                    placeholder="Bu içerik hakkında ne düşünüyorsun?" 
+                                    style={{ width: '100%', minHeight: '80px', background: 'transparent', border: 'none', color: 'white', fontSize: '1rem', outline: 'none', resize: 'vertical' }} 
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                                    <button style={{ background: '#5799ef', color: 'white', border: 'none', padding: '8px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Gönder</button>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>

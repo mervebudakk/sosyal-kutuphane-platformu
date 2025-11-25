@@ -1,198 +1,233 @@
-// frontend/src/Sayfalar/AramaSayfasi.jsx
-
 import React, { useState } from 'react';
-// DİKKAT: apiServis dosyasından yeni eklediğimiz kitap fonksiyonunu da import ediyoruz
+import { Search, Film, BookOpen, Loader, ChevronRight, CheckCircle, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { 
     hariciFilmleriAra, 
     hariciKitaplariAra, 
-    icerigiKaydetVeDetaylariCek, // Bu film için (Merve'nin yazdığı)
-    kitapKaydetVeDetaylariCek   // Bu kitap için (Senin yazdığın)
-} from '../Servisler/apiServis'; 
-import { useNavigate } from 'react-router-dom'; // <-- Bunu ekle
-
-// --- Sekme Stili (Görsel değişiklik yok) ---
-const SekmeStili = (aktif) => ({
-    padding: '10px 20px',
-    cursor: 'pointer',
-    borderBottom: aktif ? '3px solid #333' : '1px solid #ccc',
-    fontWeight: aktif ? 'bold' : 'normal',
-    marginRight: '10px',
-    display: 'inline-block'
-});
+    icerigiKaydetVeDetaylariCek, 
+    kitapKaydetVeDetaylariCek 
+} from '../Servisler/apiServis';
 
 const AramaSayfasi = () => { 
     const navigate = useNavigate();
-    // State'ler
-    const [aktifKategori, setAktifKategori] = useState('film'); // 'film' veya 'kitap'
+    const [aktifKategori, setAktifKategori] = useState('film');
     const [aramaTerimi, setAramaTerimi] = useState('');
-    const [sonuclar, setSonuclar] = useState([]); 
-    const [yukleniyor, setYukleniyor] = useState(false); 
-    const [hata, setHata] = useState(null); 
-    const [kayitDurumu, setKayitDurumu] = useState({}); // { 'id123': 'yukleniyor' | 'basarili' }
+    const [sonuclar, setSonuclar] = useState([]);
+    const [yukleniyor, setYukleniyor] = useState(false);
+    const [hata, setHata] = useState(null);
+    const [kayitDurumu, setKayitDurumu] = useState({}); 
 
-    // --- ARAMA FONKSİYONU ---
+    // --- MANTIK KISMI (AYNEN KORUNDU) ---
     const aramaYap = async (e) => { 
-        e.preventDefault();
+        if (e) e.preventDefault();
         if (!aramaTerimi.trim()) return;
-
-        setYukleniyor(true);
-        setHata(null);
-        setSonuclar([]);
-        setKayitDurumu({});
-
+        setYukleniyor(true); setHata(null); setSonuclar([]); setKayitDurumu({});
         try {
             let gelenSonuclar = [];
-            
-            if (aktifKategori === 'film') {
-                // TMDb API'den film ara
-                gelenSonuclar = await hariciFilmleriAra(aramaTerimi);
-            } else {
-                // Google Books API'den kitap ara (Dilay'ın Modülü)
-                gelenSonuclar = await hariciKitaplariAra(aramaTerimi);
-            }
-
+            if (aktifKategori === 'film') gelenSonuclar = await hariciFilmleriAra(aramaTerimi);
+            else gelenSonuclar = await hariciKitaplariAra(aramaTerimi);
             setSonuclar(gelenSonuclar);
-        } catch (err) {
-            setHata(err.message);
-        } finally {
-            setYukleniyor(false);
-        }
+        } catch (err) { setHata(err.message); } finally { setYukleniyor(false); }
     };
 
-    // --- DETAY VE KAYDETME FONKSİYONU ---
     const detaySayfasinaGit = async (hariciId) => {
-        // Kullanıcıya geri bildirim vermek için durumu güncelle
         setKayitDurumu(prev => ({ ...prev, [hariciId]: 'yukleniyor' }));
-        setHata(null);
-
         try {
             let kaydedilenIcerik;
-
-            // Kategoriye göre doğru kaydetme fonksiyonunu seçiyoruz (KRİTİK NOKTA)
-            if (aktifKategori === 'film') {
-                console.log("Film detayları çekiliyor ve kaydediliyor...");
-                kaydedilenIcerik = await icerigiKaydetVeDetaylariCek(hariciId);
-            } else {
-                console.log("Kitap detayları çekiliyor ve kaydediliyor...");
-                kaydedilenIcerik = await kitapKaydetVeDetaylariCek(hariciId);
-            }
-            
+            if (aktifKategori === 'film') kaydedilenIcerik = await icerigiKaydetVeDetaylariCek(hariciId);
+            else kaydedilenIcerik = await kitapKaydetVeDetaylariCek(hariciId);
             setKayitDurumu(prev => ({ ...prev, [hariciId]: 'basarili' }));
-
-            // Yönlendirme Simülasyonu
-            // Gerçek projede: navigate(`/icerik/${kaydedilenIcerik.id}`);
-            console.log(`✅ İŞLEM BAŞARILI! Veritabanı ID: ${kaydedilenIcerik.id}`);
-            navigate(`/icerik/${kaydedilenIcerik.icerik_id}`);
-
+            setTimeout(() => { navigate(`/icerik/${kaydedilenIcerik.icerik_id}`); }, 500);
         } catch (err) {
-            console.error("Detay hatası:", err);
+            console.error(err);
             setKayitDurumu(prev => ({ ...prev, [hariciId]: 'hata' }));
-            setHata(`Detay çekme hatası: ${err.message}`);
-            alert("Bir hata oluştu: " + err.message);
+            alert("Hata: " + err.message);
         }
     };
+    // ------------------------------------
 
     return (
-        <div style={{ maxWidth: '900px', margin: '50px auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-            
-            {/* Kategori Sekmeleri */}
-            <div style={{ marginBottom: '20px', borderBottom: '1px solid #ccc' }}>
-                <div 
-                    style={SekmeStili(aktifKategori === 'film')}
-                    onClick={() => { setAktifKategori('film'); setSonuclar([]); setAramaTerimi(''); setHata(null); }}
-                >
-                    🎥 Filmler
-                </div>
-                <div 
-                    style={SekmeStili(aktifKategori === 'kitap')}
-                    onClick={() => { setAktifKategori('kitap'); setSonuclar([]); setAramaTerimi(''); setHata(null); }}
-                >
-                    📚 Kitaplar
-                </div>
-            </div>
-
-            <h2>{aktifKategori === 'film' ? 'Film' : 'Kitap'} Arama</h2>
-            
-            {/* Arama Formu */}
-            <form onSubmit={aramaYap} style={{ marginBottom: '30px' }}>
-                <input
-                    type="text"
-                    value={aramaTerimi}
-                    onChange={(e) => setAramaTerimi(e.target.value)}
-                    placeholder={`${aktifKategori === 'film' ? 'Matrix, Interstellar...' : 'Harry Potter, 1984...'} `}
-                    style={{ padding: '12px', width: '70%', marginRight: '10px', fontSize: '16px', borderRadius: '4px', border: '1px solid #ddd' }}
-                />
-                <button 
-                    type="submit" 
-                    disabled={yukleniyor} 
-                    style={{ 
-                        padding: '12px 24px', 
-                        cursor: yukleniyor ? 'not-allowed' : 'pointer',
-                        backgroundColor: '#333',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontSize: '16px'
+        <div style={{
+            minHeight: '100vh',
+            background: '#121212', // IMDb Main Background
+            padding: '40px 20px',
+            fontFamily: "'Roboto', sans-serif",
+            color: '#ffffff'
+        }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                
+                {/* Header */}
+                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <h1 style={{ 
+                        color: '#F5C518', // IMDb Sarısı
+                        fontSize: '3rem', 
+                        fontWeight: '900', 
+                        marginBottom: '10px', 
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px'
                     }}>
-                    {yukleniyor ? 'Aranıyor...' : 'Ara'}
-                </button>
-            </form>
+                        Keşfet & Ara
+                    </h1>
+                    <p style={{ color: '#CCCCCC', fontSize: '1.1rem' }}>
+                        Favori içeriklerini bul ve koleksiyonuna ekle.
+                    </p>
+                </div>
 
-            {hata && <div style={{ padding: '10px', backgroundColor: '#ffebee', color: '#c62828', marginBottom: '20px', borderRadius: '4px' }}>Hata: {hata}</div>}
+                {/* Kategori Seçimi */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '40px' }}>
+                    {[
+                        { id: 'film', icon: Film, label: 'Filmler' },
+                        { id: 'kitap', icon: BookOpen, label: 'Kitaplar' }
+                    ].map(kategori => {
+                        const Icon = kategori.icon;
+                        const aktif = aktifKategori === kategori.id;
+                        return (
+                            <button
+                                key={kategori.id}
+                                onClick={() => { setAktifKategori(kategori.id); setSonuclar([]); setAramaTerimi(''); setHata(null); }}
+                                style={{
+                                    background: aktif ? '#F5C518' : '#1F1F1F',
+                                    color: aktif ? 'black' : 'white',
+                                    border: aktif ? 'none' : '1px solid #333',
+                                    padding: '12px 30px',
+                                    borderRadius: '25px',
+                                    cursor: 'pointer',
+                                    fontSize: '1rem',
+                                    fontWeight: 'bold',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                <Icon size={20} />
+                                {kategori.label}
+                            </button>
+                        );
+                    })}
+                </div>
 
-            {/* Sonuç Listeleme */}
-            {sonuclar.length > 0 && (
-                <div>
-                    <h3 style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>Bulunan {sonuclar.length} Sonuç:</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '20px' }}>
-                        {sonuclar.map((icerik, index) => {
-                            const durum = kayitDurumu[icerik.harici_id];
-                            
-                            // Duruma göre kenarlık rengi
-                            let borderStyle = '1px solid #eee';
-                            if (durum === 'yukleniyor') borderStyle = '2px solid orange';
-                            if (durum === 'basarili') borderStyle = '2px solid green';
-                            if (durum === 'hata') borderStyle = '2px solid red';
-
-                            return (
-                                <div 
-                                    key={index} 
-                                    style={{ 
-                                        border: borderStyle, 
-                                        padding: '10px', 
-                                        cursor: 'pointer',
-                                        borderRadius: '8px',
-                                        boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                                        transition: 'transform 0.2s',
-                                        backgroundColor: durum === 'yukleniyor' ? '#fff8e1' : 'white'
-                                    }}
-                                    onClick={() => detaySayfasinaGit(icerik.harici_id)}
-                                >
-                                    <div style={{ position: 'relative', width: '100%', paddingTop: '150%', marginBottom: '10px', backgroundColor: '#f0f0f0' }}>
-                                        <img 
-                                            src={icerik.kapak_url || 'https://via.placeholder.com/150x225?text=Resim+Yok'} 
-                                            alt={icerik.baslik} 
-                                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} 
-                                        />
-                                    </div>
-                                    <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {icerik.baslik}
-                                    </p>
-                                    <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>{icerik.yayin_yili}</p>
-                                    
-                                    {/* Durum Mesajı */}
-                                    {durum === 'yukleniyor' && <p style={{ fontSize: '11px', color: 'orange', fontWeight: 'bold' }}>⏳ İşleniyor...</p>}
-                                    {durum === 'basarili' && <p style={{ fontSize: '11px', color: 'green', fontWeight: 'bold' }}>✅ Eklendi</p>}
-                                </div>
-                            );
-                        })}
+                {/* Arama Kutusu */}
+                <div style={{ marginBottom: '50px' }}>
+                    <div style={{
+                        background: '#1F1F1F', 
+                        padding: '8px', 
+                        borderRadius: '4px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        border: '1px solid #333',
+                        maxWidth: '700px', 
+                        margin: '0 auto'
+                    }}>
+                        <Search size={24} color="#F5C518" style={{ marginLeft: '15px', marginRight: '15px' }} />
+                        <input
+                            type="text"
+                            value={aramaTerimi}
+                            onChange={(e) => setAramaTerimi(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && aramaYap()}
+                            placeholder={aktifKategori === 'film' ? 'Matrix, Interstellar...' : 'Harry Potter, 1984...'}
+                            style={{
+                                flex: 1, 
+                                border: 'none', 
+                                outline: 'none', 
+                                fontSize: '1.1rem', 
+                                padding: '10px 0', 
+                                background: 'transparent', 
+                                color: 'white' 
+                            }}
+                        />
+                        <button 
+                            onClick={aramaYap}
+                            disabled={yukleniyor}
+                            style={{
+                                background: '#F5C518',
+                                color: 'black', 
+                                border: 'none', 
+                                borderRadius: '4px', 
+                                padding: '10px 30px',
+                                fontSize: '1rem', 
+                                fontWeight: 'bold', 
+                                cursor: yukleniyor ? 'not-allowed' : 'pointer',
+                                opacity: yukleniyor ? 0.7 : 1,
+                                transition: 'background 0.2s'
+                            }}
+                        >
+                            {yukleniyor ? <Loader size={20} className="animate-spin" /> : 'Ara'}
+                        </button>
                     </div>
                 </div>
-            )}
-            
-            {!yukleniyor && sonuclar.length === 0 && !hata && aramaTerimi && (
-                <p style={{ textAlign: 'center', color: '#888', marginTop: '30px' }}>Sonuç bulunamadı.</p>
-            )}
+
+                {/* Hata Mesajı */}
+                {hata && (
+                    <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#ef4444', padding: '15px', borderRadius: '4px', marginBottom: '30px', maxWidth: '700px', margin: '0 auto 30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <AlertCircle size={20} /> <strong>Hata:</strong> {hata}
+                    </div>
+                )}
+
+                {/* Sonuçlar */}
+                {sonuclar.length > 0 && (
+                    <div>
+                        <h3 style={{ color: '#F5C518', fontSize: '1.5rem', marginBottom: '20px', fontWeight: '700', borderLeft: '4px solid #F5C518', paddingLeft: '10px' }}>
+                            Sonuçlar ({sonuclar.length})
+                        </h3>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '20px' }}>
+                            {sonuclar.map((icerik, index) => {
+                                const durum = kayitDurumu[icerik.harici_id];
+                                return (
+                                    <div 
+                                        key={index}
+                                        onClick={() => detaySayfasinaGit(icerik.harici_id)}
+                                        style={{
+                                            background: '#1A1A1A', 
+                                            borderRadius: '4px', // Köşeli yapı
+                                            overflow: 'hidden', 
+                                            cursor: 'pointer', 
+                                            transition: 'transform 0.2s ease',
+                                            position: 'relative',
+                                            border: durum === 'yukleniyor' ? '2px solid #F5C518' : '1px solid #333'
+                                        }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.border = '1px solid #F5C518'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.border = '1px solid #333'; }}
+                                    >
+                                        {/* Durum Badge */}
+                                        {durum && (
+                                            <div style={{
+                                                position: 'absolute', top: '0', right: '0',
+                                                background: durum === 'yukleniyor' ? '#F5C518' : '#5799ef',
+                                                color: durum === 'yukleniyor' ? 'black' : 'white',
+                                                padding: '4px 10px', 
+                                                borderBottomLeftRadius: '8px',
+                                                fontSize: '0.75rem', fontWeight: 'bold', zIndex: 10,
+                                                display: 'flex', alignItems: 'center', gap: '4px'
+                                            }}>
+                                                {durum === 'yukleniyor' ? <><Loader size={12} className="animate-spin" /> Hazırlanıyor</> : <><ChevronRight size={14} /> Açılıyor</>}
+                                            </div>
+                                        )}
+                                        
+                                        <div style={{ width: '100%', paddingTop: '150%', position: 'relative', background: '#222' }}>
+                                            <img 
+                                                src={icerik.kapak_url || 'https://via.placeholder.com/300x450?text=Resim+Yok'} 
+                                                alt={icerik.baslik}
+                                                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                                            />
+                                        </div>
+                                        <div style={{ padding: '12px' }}>
+                                            <h4 style={{ margin: '0 0 5px 0', fontSize: '0.95rem', fontWeight: 'bold', color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {icerik.baslik}
+                                            </h4>
+                                            <span style={{ color: '#AAAAAA', fontSize: '0.85rem' }}>
+                                                {icerik.yayin_yili}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } } .animate-spin { animation: spin 1s linear infinite; }`}</style>
         </div>
     );
 };

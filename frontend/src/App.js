@@ -1,30 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom'; // 1. Router importları
-import { supabase } from './Servisler/supabaseServis';
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from './Servisler/supabaseServis'; 
+import { Home, Search, User, LogOut, BookOpen, Library } from 'lucide-react'; // Library ikonu eklendi
 
-// Sayfaları İçe Aktar
+// Sayfalar
 import GirisKayit from './Sayfalar/GirisKayit.jsx'; 
 import AramaSayfasi from './Sayfalar/AramaSayfasi.jsx'; 
-import IcerikDetaySayfasi from './Sayfalar/IcerikDetaySayfasi.jsx'; // 2. Detay sayfasını ekle
+import IcerikDetaySayfasi from './Sayfalar/IcerikDetaySayfasi.jsx';
 import ProfilSayfasi from './Sayfalar/ProfilSayfasi.jsx';
-// import GezinmeCubugu from './Bilesenler/GezinmeCubugu.jsx'; // Bunu şimdilik Link ile değiştireceğiz
 
-// --- GÜNCEL ANASAYFA VE PROFIL BİLEŞENLERİ ---
+// Feed Bileşeni
 function AnaSayfaGoster() {
     return (
-        <div style={{ padding: '20px' }}>
-            <h2>Sosyal Akış (Feed)</h2>
-            <p>Burada takip ettiğiniz kullanıcıların son aktiviteleri listelenecektir.</p>
+        <div style={{ textAlign: 'center', padding: '100px 20px', color: '#CCCCCC' }}>
+            <div style={{ 
+                background: '#1F1F1F', borderRadius: '50%', width: '80px', height: '80px', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
+                border: '2px solid #333'
+            }}>
+                <BookOpen size={40} color="#F5C518" />
+            </div>
+            <h2 style={{ color: 'white', fontSize: '2rem', marginBottom: '10px' }}>Sosyal Akış (Feed)</h2>
+            <p style={{ maxWidth: '500px', margin: '0 auto', lineHeight: '1.6' }}>
+                Takip ettiğin arkadaşların ne okuyor, ne izliyor? <br/>
+                <span style={{ color: '#F5C518' }}>(Yakında burada göreceksin)</span>
+            </p>
         </div>
     );
 }
 
 function App() {
     const [session, setSession] = useState(null);
-    const navigate = useNavigate(); // Yönlendirme için
+    const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
-        // Oturum kontrolü
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
         });
@@ -40,46 +50,84 @@ function App() {
                  authListener.subscription.unsubscribe();
             }
         };
-    }, [navigate]);
+    }, []);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        navigate('/'); // Çıkış yapınca başa dön
+        navigate('/');
+    };
+
+    // Kullanıcı adını (e-postadan) almak için küçük bir helper
+    const kullaniciAdi = session?.user?.email?.split('@')[0] || 'Kullanıcı';
+
+    const NavLink = ({ to, icon: Icon, label }) => {
+        const isActive = location.pathname === to;
+        return (
+            <Link to={to} style={{ 
+                display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', 
+                color: isActive ? '#F5C518' : '#FFFFFF', fontWeight: isActive ? 'bold' : 'normal',
+                padding: '8px 16px', borderRadius: '20px',
+                background: isActive ? 'rgba(245, 197, 24, 0.1)' : 'transparent', transition: 'all 0.3s ease'
+            }}>
+                <Icon size={20} /> {label}
+            </Link>
+        );
     };
 
     return (
-        <div className="container" style={{ textAlign: 'center', fontFamily: 'Arial, sans-serif' }}>
-            <header style={{ padding: '20px', backgroundColor: '#333', color: 'white' }}>
-                <h1 style={{ margin: 0 }}>Sosyal Kütüphane Platformu</h1>
-            </header>
-            
+        <div style={{ minHeight: '100vh', background: '#121212', color: 'white', fontFamily: "'Roboto', sans-serif" }}>
             {!session ? (
-                // Oturum Yoksa
                 <GirisKayit />
             ) : (
-                // Oturum Varsa
                 <div>
-                    <div style={{ padding: '10px', backgroundColor: '#f4f4f4', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Hoş Geldiniz, <strong>{session.user.email}</strong>!</span>
-                        <button onClick={handleLogout} style={{ padding: '5px 15px', cursor: 'pointer', backgroundColor: '#c0392b', color: 'white', border: 'none', borderRadius: '4px' }}>
-                            Çıkış Yap
-                        </button>
-                    </div>
-                    
-                    {/* 3. YENİ NAVİGASYON (Router Uyumlu) */}
-                    <nav style={{ padding: '15px', borderBottom: '1px solid #eee', marginBottom: '20px' }}>
-                        <Link to="/" style={{ margin: '0 15px', textDecoration: 'none', color: '#333', fontWeight: 'bold' }}>Ana Sayfa (Feed)</Link>
-                        <Link to="/arama" style={{ margin: '0 15px', textDecoration: 'none', color: '#333', fontWeight: 'bold' }}>🔍 Arama & Keşfet</Link>
-                        <Link to="/profil" style={{ margin: '0 15px', textDecoration: 'none', color: '#333', fontWeight: 'bold' }}>👤 Kütüphanem</Link>
+                    {/* ÜST NAVİGASYON ÇUBUĞU */}
+                    <nav style={{ 
+                        background: '#1F1F1F', borderBottom: '1px solid #333', padding: '15px 0',
+                        position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                    }}>
+                        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            
+                            {/* LOGO (DÜZELTİLDİ - Artık kutu yok, temiz ikon+yazı) */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.5rem', fontWeight: '900', letterSpacing: '1px', color: '#F5C518' }}>
+                                <Library size={32} strokeWidth={2.5} /> {/* Kitaplık İkonu */}
+                                <span>SOSYAL<span style={{ color: 'white' }}>KÜTÜPHANE</span></span>
+                            </div>
+
+                            {/* ORTA MENÜ */}
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <NavLink to="/" icon={Home} label="Ana Sayfa" />
+                                <NavLink to="/arama" icon={Search} label="Keşfet" />
+                                <NavLink to="/profil" icon={User} label="Kütüphanem" />
+                            </div>
+
+                            {/* SAĞ TARAF: HOŞGELDİN + ÇIKIŞ */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                {/* Hoşgeldin Kısmı (GERİ GELDİ) */}
+                                <div style={{ textAlign: 'right', fontSize: '0.9rem', display: 'none', md: 'block' }}>
+                                    <span style={{ color: '#888' }}>Hoş geldin,</span> <br/>
+                                    <span style={{ color: 'white', fontWeight: 'bold' }}>{kullaniciAdi}</span>
+                                </div>
+
+                                <button 
+                                    onClick={handleLogout} 
+                                    style={{ 
+                                        background: 'transparent', border: '1px solid #333', color: '#ef4444', padding: '8px 16px', borderRadius: '4px', 
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => { e.target.style.background = 'rgba(239, 68, 68, 0.1)'; e.target.style.borderColor = '#ef4444'; }}
+                                    onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.borderColor = '#333'; }}
+                                >
+                                    <LogOut size={16} /> Çıkış
+                                </button>
+                            </div>
+                        </div>
                     </nav>
                     
-                    {/* 4. SAYFA YÖNLENDİRİCİSİ (ROUTES) */}
                     <main>
                         <Routes>
                             <Route path="/" element={<AnaSayfaGoster />} />
                             <Route path="/arama" element={<AramaSayfasi />} />
                             <Route path="/profil" element={<ProfilSayfasi />} />
-                            {/* İŞTE SİHİRLİ SATIR BURASI 👇 */}
                             <Route path="/icerik/:id" element={<IcerikDetaySayfasi />} />
                         </Routes>
                     </main>
