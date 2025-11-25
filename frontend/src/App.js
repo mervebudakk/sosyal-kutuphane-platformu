@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom'; // 1. Router importları
 import { supabase } from './Servisler/supabaseServis';
+
+// Sayfaları İçe Aktar
 import GirisKayit from './Sayfalar/GirisKayit.jsx'; 
 import AramaSayfasi from './Sayfalar/AramaSayfasi.jsx'; 
-import GezinmeCubugu from './Bilesenler/GezinmeCubugu.jsx'; // Yeni bileşenimiz
+import IcerikDetaySayfasi from './Sayfalar/IcerikDetaySayfasi.jsx'; // 2. Detay sayfasını ekle
+// import GezinmeCubugu from './Bilesenler/GezinmeCubugu.jsx'; // Bunu şimdilik Link ile değiştireceğiz
 
+// --- GÜNCEL ANASAYFA VE PROFIL BİLEŞENLERİ ---
 function AnaSayfaGoster() {
-    // Burası Sosyal Akış (Feed) sayfası olacak. Şimdilik sadece mesaj gösteriyoruz.
     return (
         <div style={{ padding: '20px' }}>
             <h2>Sosyal Akış (Feed)</h2>
-            <p>Burada takip ettiğiniz kullanıcıların son aktiviteleri (Puanlama, Yorum) listelenecektir.</p>
+            <p>Burada takip ettiğiniz kullanıcıların son aktiviteleri listelenecektir.</p>
         </div>
     );
 }
 
 function ProfilSayfasiGoster() {
-    // Burası Kütüphanem / Profil sayfası olacak.
     return (
         <div style={{ padding: '20px' }}>
             <h2>Kütüphanem / Profil</h2>
@@ -24,14 +27,12 @@ function ProfilSayfasiGoster() {
     );
 }
 
-
 function App() {
     const [session, setSession] = useState(null);
-    // Hangi sekmenin aktif olduğunu tutar. Başlangıçta Feed açılır.
-    const [aktifSekme, setAktifSekme] = useState('feed'); 
+    const navigate = useNavigate(); // Yönlendirme için
 
-    // Oturum durumunu dinleme mantığı
     useEffect(() => {
+        // Oturum kontrolü
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
         });
@@ -39,8 +40,6 @@ function App() {
         const { data: authListener } = supabase.auth.onAuthStateChange(
             (_event, session) => {
                 setSession(session);
-                // Oturum değiştiğinde (örn: giriş yaptığında) ana sayfaya yönlendir
-                if (session) setAktifSekme('feed'); 
             }
         );
 
@@ -49,49 +48,48 @@ function App() {
                  authListener.subscription.unsubscribe();
             }
         };
-    }, []);
+    }, [navigate]);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
+        navigate('/'); // Çıkış yapınca başa dön
     };
 
-    // Aktif sekmeye göre bileşeni render eden fonksiyon
-    const renderAktifSayfa = () => {
-        switch (aktifSekme) {
-            case 'feed':
-                return <AnaSayfaGoster />;
-            case 'arama':
-                return <AramaSayfasi />;
-            case 'profil':
-                return <ProfilSayfasiGoster />;
-            default:
-                return <AnaSayfaGoster />;
-        }
-    }
-
     return (
-        <div className="container" style={{ textAlign: 'center' }}>
-            <header>
-                <h1>Sosyal Kütüphane Platformu</h1>
+        <div className="container" style={{ textAlign: 'center', fontFamily: 'Arial, sans-serif' }}>
+            <header style={{ padding: '20px', backgroundColor: '#333', color: 'white' }}>
+                <h1 style={{ margin: 0 }}>Sosyal Kütüphane Platformu</h1>
             </header>
             
             {!session ? (
-                // Oturum yoksa, Giriş/Kayıt ekranını göster
+                // Oturum Yoksa
                 <GirisKayit />
             ) : (
-                // Oturum varsa, Ana Uygulama Layout'unu göster
+                // Oturum Varsa
                 <div>
-                    <div style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
-                        Hoş Geldiniz, {session.user.email}! 
-                        <button onClick={handleLogout} style={{ marginLeft: '15px', padding: '5px 10px', cursor: 'pointer' }}>
+                    <div style={{ padding: '10px', backgroundColor: '#f4f4f4', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Hoş Geldiniz, <strong>{session.user.email}</strong>!</span>
+                        <button onClick={handleLogout} style={{ padding: '5px 15px', cursor: 'pointer', backgroundColor: '#c0392b', color: 'white', border: 'none', borderRadius: '4px' }}>
                             Çıkış Yap
                         </button>
                     </div>
                     
-                    <GezinmeCubugu setActiveTab={setAktifSekme} /> 
+                    {/* 3. YENİ NAVİGASYON (Router Uyumlu) */}
+                    <nav style={{ padding: '15px', borderBottom: '1px solid #eee', marginBottom: '20px' }}>
+                        <Link to="/" style={{ margin: '0 15px', textDecoration: 'none', color: '#333', fontWeight: 'bold' }}>Ana Sayfa (Feed)</Link>
+                        <Link to="/arama" style={{ margin: '0 15px', textDecoration: 'none', color: '#333', fontWeight: 'bold' }}>🔍 Arama & Keşfet</Link>
+                        <Link to="/profil" style={{ margin: '0 15px', textDecoration: 'none', color: '#333', fontWeight: 'bold' }}>👤 Kütüphanem</Link>
+                    </nav>
                     
+                    {/* 4. SAYFA YÖNLENDİRİCİSİ (ROUTES) */}
                     <main>
-                        {renderAktifSayfa()}
+                        <Routes>
+                            <Route path="/" element={<AnaSayfaGoster />} />
+                            <Route path="/arama" element={<AramaSayfasi />} />
+                            <Route path="/profil" element={<ProfilSayfasiGoster />} />
+                            {/* İŞTE SİHİRLİ SATIR BURASI 👇 */}
+                            <Route path="/icerik/:id" element={<IcerikDetaySayfasi />} />
+                        </Routes>
                     </main>
                 </div>
             )}

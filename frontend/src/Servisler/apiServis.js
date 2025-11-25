@@ -150,7 +150,8 @@ export const kitapKaydetVeDetaylariCek = async (googleBookId) => {
             icerik_turu: 'kitap',
             harici_kaynak: 'google_books',
             harici_id: data.id,
-            baslik: info.title,
+            // Kitap başlığı 255 karakteri geçerse kes
+            baslik: info.title ? info.title.substring(0, 255) : "Başlıksız",
             ozet: info.description ? info.description.substring(0, 1000) : "Açıklama yok.", // Çok uzun özetleri kırpabiliriz
             yayin_yili: info.publishedDate ? info.publishedDate.substring(0, 4) : null,
             sure_sayfa_sayisi: info.pageCount || 0, // Kitapta sayfa sayısı
