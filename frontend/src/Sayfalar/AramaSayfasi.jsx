@@ -13,7 +13,8 @@ import {
   hariciKitaplariAra,
   icerigiKaydetVeDetaylariCek,
   kitapKaydetVeDetaylariCek,
-  filmleriOnyilaGoreGetir,
+  filmleriFiltreyeGoreGetir,
+  kitaplariFiltreyeGoreGetir,
 } from "../Servisler/apiServis";
 
 // TMDb genre id eşleştirmesi (Türkçe etiket → TMDb ID)
@@ -26,6 +27,15 @@ const tmdbGenreMap = {
   Animasyon: 16,
 };
 
+const kitapGenreMap = {
+  Roman: "fiction",
+  Fantastik: "fantasy",
+  Bilimkurgu: "science fiction",
+  "Kişisel Gelişim": "self-help",
+  Tarih: "history",
+  Biyografi: "biography",
+};
+
 const AramaSayfasi = () => {
   const navigate = useNavigate();
 
@@ -35,6 +45,9 @@ const AramaSayfasi = () => {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState(null);
   const [kayitDurumu, setKayitDurumu] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [aramaModu, setAramaModu] = useState(null);
 
   // Filtre state'leri
   const [selectedGenre, setSelectedGenre] = useState("");
@@ -70,11 +83,14 @@ const AramaSayfasi = () => {
     { label: "1980'ler", value: "1980" },
   ];
 
-  // ANA ARAMA / FİLTRE ÇALIŞMASI
   const aramaYap = async (e) => {
     if (e) e.preventDefault();
 
     const query = aramaTerimi.trim();
+
+    // İlk aramada her zaman 1. sayfadan başla
+    setCurrentPage(1);
+    setHasMore(true);
     setYukleniyor(true);
     setHata(null);
     setSonuclar([]);
@@ -85,17 +101,22 @@ const AramaSayfasi = () => {
 
       // 1) ARAMA MODU: kullanıcı bir şey yazdıysa → sadece başlığa göre arama
       if (query.length > 0) {
+        setAramaModu("search");
+
         if (aktifKategori === "film") {
-          gelenSonuclar = await hariciFilmleriAra(query);
+          gelenSonuclar = await hariciFilmleriAra(query, 1);
         } else {
-          gelenSonuclar = await hariciKitaplariAra(query);
+          gelenSonuclar = await hariciKitaplariAra(query, 1);
         }
       }
       // 2) FİLTRE MODU: arama terimi BOŞ ise → filtrelere göre listeleme
       else {
-        // Şu an filtre modu sadece FİLMLER için (TMDb discover)
+        setAramaModu("filter");
         if (aktifKategori === "film") {
-          const decadeStart = selectedDecade ? parseInt(selectedDecade, 10) : null;
+          const decadeStart = selectedDecade
+            ? parseInt(selectedDecade, 10)
+            : null;
+
           const genreId =
             selectedGenre && tmdbGenreMap[selectedGenre]
               ? tmdbGenreMap[selectedGenre]
@@ -109,27 +130,129 @@ const AramaSayfasi = () => {
             return;
           }
 
-          // Yıl seçili değilse ama tür seçiliyse: herhangi yıl, sadece türe göre discover yapmak için
           const discoverStart = decadeStart || 1980;
 
-          gelenSonuclar = await filmleriOnyilaGoreGetir(
+          gelenSonuclar = await filmleriFiltreyeGoreGetir(
             discoverStart,
             sortOption,
             genreId
           );
         } else {
-          // Kitaplar için şimdilik sadece arama kutusu üzerinden çalışıyoruz
-          setHata(
-            "Kitaplar için şu anda sadece arama kutusunu kullanabilirsiniz."
+          // ✅ Kitaplar için de filtre modu (Google Books)
+          const decadeStart = selectedDecade
+            ? parseInt(selectedDecade, 10)
+            : null;
+
+          const subject =
+            selectedGenre && kitapGenreMap[selectedGenre]
+              ? kitapGenreMap[selectedGenre]
+              : null;
+
+          if (!decadeStart && !subject) {
+            setHata(
+              "Filtreleme yapmak için en az bir filtre seçin (yıl veya tür)."
+            );
+            setYukleniyor(false);
+            return;
+          }
+
+          gelenSonuclar = await kitaplariFiltreyeGoreGetir(
+            decadeStart,
+            subject,
+            sortOption,
+            1
           );
-          setYukleniyor(false);
-          return;
         }
       }
 
       setSonuclar(gelenSonuclar);
+      setHasMore(gelenSonuclar.length > 0);
     } catch (err) {
       setHata(err.message);
+      setHasMore(false);
+    } finally {
+      setYukleniyor(false);
+    }
+  };
+
+  const dahaFazlaYukle = async () => {
+    if (yukleniyor) return; // Çifte tıklamayı engelle
+
+    const query = aramaTerimi.trim();
+
+    // Hiç arama yapılmadıysa veya mod belli değilse çalışmasın
+    if (!aramaModu) return;
+
+    const nextPage = currentPage + 1;
+
+    setYukleniyor(true);
+    setHata(null);
+
+    try {
+      let yeniSonuclar = [];
+
+      if (aramaModu === "search") {
+        // ARAMA MODU (arama kutusuna yazılmış hali)
+        if (query.length === 0) {
+          setYukleniyor(false);
+          return;
+        }
+
+        if (aktifKategori === "film") {
+          yeniSonuclar = await hariciFilmleriAra(query, nextPage);
+        } else {
+          yeniSonuclar = await hariciKitaplariAra(query, nextPage);
+        }
+      } else if (aramaModu === "filter") {
+        // FİLTRE MODU
+
+        if (aktifKategori === "film") {
+          const decadeStart = selectedDecade
+            ? parseInt(selectedDecade, 10)
+            : null;
+
+          const genreId =
+            selectedGenre && tmdbGenreMap[selectedGenre]
+              ? tmdbGenreMap[selectedGenre]
+              : null;
+
+          const discoverStart = decadeStart || 1980;
+
+          yeniSonuclar = await filmleriFiltreyeGoreGetir(
+            discoverStart,
+            sortOption,
+            genreId,
+            nextPage
+          );
+        } else if (aktifKategori === "kitap") {
+          const decadeStart = selectedDecade
+            ? parseInt(selectedDecade, 10)
+            : null;
+
+          const subject =
+            selectedGenre && kitapGenreMap[selectedGenre]
+              ? kitapGenreMap[selectedGenre]
+              : null;
+
+          yeniSonuclar = await kitaplariFiltreyeGoreGetir(
+            decadeStart,
+            subject,
+            sortOption,
+            nextPage
+          );
+        }
+      }
+
+      // Yeni sayfada sonuç yoksa butonu gizle
+      if (!yeniSonuclar || yeniSonuclar.length === 0) {
+        setHasMore(false);
+      } else {
+        setSonuclar((prev) => [...prev, ...yeniSonuclar]);
+        setCurrentPage(nextPage);
+      }
+    } catch (err) {
+      setHata(err.message);
+      setHasMore(false);
     } finally {
       setYukleniyor(false);
     }
@@ -333,26 +456,24 @@ const AramaSayfasi = () => {
           </select>
 
           {/* 2. YIL (Onyıl) seçimi - Tür'ün hemen yanına ekledik */}
-          {aktifKategori === "film" && (
-            <select
-              value={selectedDecade}
-              onChange={(e) => setSelectedDecade(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                background: "#1F1F1F",
-                color: "#FFFFFF",
-                borderRadius: "6px",
-                border: "1px solid #444",
-                fontSize: "0.9rem",
-              }}
-            >
-              {decadeOptions.map((d) => (
-                <option key={d.value || "hepsi"} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            value={selectedDecade}
+            onChange={(e) => setSelectedDecade(e.target.value)}
+            style={{
+              padding: "8px 10px",
+              background: "#1F1F1F",
+              color: "#FFFFFF",
+              borderRadius: "6px",
+              border: "1px solid #444",
+              fontSize: "0.9rem",
+            }}
+          >
+            {decadeOptions.map((d) => (
+              <option key={d.value || "hepsi"} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
 
           {/* 3. Sıralama - marginLeft: 'auto' ile en sağa itiyoruz */}
           <select
@@ -517,6 +638,33 @@ const AramaSayfasi = () => {
                 );
               })}
             </div>
+            {/* Daha Fazla Göster */}
+            {hasMore && (
+              <div
+                style={{
+                  marginTop: "24px",
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                <button
+                  onClick={dahaFazlaYukle}
+                  disabled={yukleniyor}
+                  style={{
+                    padding: "10px 24px",
+                    borderRadius: "20px",
+                    border: "1px solid #F5C518",
+                    background: "#1F1F1F",
+                    color: "#F5C518",
+                    fontWeight: "bold",
+                    cursor: yukleniyor ? "not-allowed" : "pointer",
+                    opacity: yukleniyor ? 0.7 : 1,
+                  }}
+                >
+                  {yukleniyor ? "Yükleniyor..." : "Daha Fazla Göster"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

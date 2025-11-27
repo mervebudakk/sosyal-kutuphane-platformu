@@ -37,46 +37,67 @@ const veriyiStandartFormataDonustur = (item, tur) => {
   return null;
 };
 
-export const hariciFilmleriAra = async (sorgu) => {
-  if (!sorgu || !TMDB_KEY) throw new Error("API Anahtarı eksik.");
-  const url = `${TMDB_URL}/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(
-    sorgu
-  )}&language=tr-TR`;
+export const hariciFilmleriAra = async (sorgu, page = 1) => {
+  if (!TMDB_KEY) throw new Error("TMDb API anahtarı eksik.");
+
+  const url =
+    `${TMDB_URL}/search/movie?` +
+    `api_key=${TMDB_KEY}` +
+    `&language=tr-TR` +
+    `&include_adult=false` +
+    `&query=${encodeURIComponent(sorgu)}` +
+    `&page=${page}`;
+
   try {
     const response = await fetch(url);
-    if (!response.ok) throw new Error(`API Hatası: ${response.status}`);
+    if (!response.ok) throw new Error(`TMDb Hatası: ${response.status}`);
+
     const data = await response.json();
-    return data.results
-      .filter((i) => i.media_type !== "person")
-      .map((i) => veriyiStandartFormataDonustur(i, "film"));
+
+    return data.results.map((item) =>
+      veriyiStandartFormataDonustur(item, "film")
+    );
   } catch (error) {
-    console.error("TMDb Hatası:", error);
+    console.error("TMDb Arama Hatası:", error);
     throw error;
   }
 };
 
-export const hariciKitaplariAra = async (sorgu) => {
-  if (!sorgu || !GOOGLE_BOOKS_KEY) throw new Error("API Anahtarı eksik.");
-  const url = `${GOOGLE_BOOKS_URL}/volumes?q=${encodeURIComponent(
-    sorgu
-  )}&key=${GOOGLE_BOOKS_KEY}&maxResults=20&langRestrict=tr`;
+export const hariciKitaplariAra = async (sorgu, page = 1) => {
+  if (!GOOGLE_BOOKS_KEY) throw new Error("Google Books API anahtarı eksik.");
+
+  const maxResults = 20;
+  const startIndex = (page - 1) * maxResults;
+
+  const url =
+    `${GOOGLE_BOOKS_URL}/volumes?` +
+    `q=${encodeURIComponent(sorgu)}` +
+    `&printType=books` +
+    `&langRestrict=tr` +
+    `&maxResults=${maxResults}` +
+    `&startIndex=${startIndex}` +
+    `&key=${GOOGLE_BOOKS_KEY}`;
+
   try {
     const response = await fetch(url);
     if (!response.ok)
       throw new Error(`Google Books Hatası: ${response.status}`);
+
     const data = await response.json();
-    if (!data.items) return [];
-    return data.items.map((i) => veriyiStandartFormataDonustur(i, "kitap"));
+    const items = data.items || [];
+
+    return items.map((item) => veriyiStandartFormataDonustur(item, "kitap"));
   } catch (error) {
-    console.error("Google Books Hatası:", error);
-    return [];
+    console.error("Google Books Arama Hatası:", error);
+    throw error;
   }
 };
 
-export const filmleriOnyilaGoreGetir = async (
+export const filmleriFiltreyeGoreGetir = async (
   baslangicYil,
   sortOption = "popularity_desc",
-  genreId = null
+  genreId = null,
+  page = 1
 ) => {
   if (!TMDB_KEY) throw new Error("TMDb API anahtarı eksik.");
 
@@ -91,11 +112,14 @@ export const filmleriOnyilaGoreGetir = async (
   const sortBy = sortMap[sortOption] || "popularity.desc";
 
   let url =
-    `${TMDB_URL}/discover/movie?api_key=${TMDB_KEY}` +
-    `&language=tr-TR&include_adult=false` +
+    `${TMDB_URL}/discover/movie?` +
+    `api_key=${TMDB_KEY}` +
+    `&language=tr-TR` +
+    `&include_adult=false` +
     `&sort_by=${sortBy}` +
     `&primary_release_date.gte=${baslangicYil}-01-01` +
-    `&primary_release_date.lte=${bitisYil}-12-31`;
+    `&primary_release_date.lte=${bitisYil}-12-31` +
+    `&page=${page}`;
 
   if (genreId) {
     url += `&with_genres=${genreId}`;
@@ -112,6 +136,69 @@ export const filmleriOnyilaGoreGetir = async (
     );
   } catch (error) {
     console.error("TMDb Discover Hatası:", error);
+    throw error;
+  }
+};
+
+export const kitaplariFiltreyeGoreGetir = async (
+  decadeStart,
+  subject, // Örn: "fantasy", "history" vs.
+  sortOption = "relevance",
+  page = 1
+) => {
+  if (!GOOGLE_BOOKS_KEY) throw new Error("Google Books API anahtarı eksik.");
+
+  const maxResults = 20;
+  const startIndex = (page - 1) * maxResults;
+
+  // Google Books gelişmiş arama sorgusu
+  const qParts = [];
+  if (subject) qParts.push(`subject:${subject}`);
+  // Hiç tür seçilmediyse çok genel bir sorgu olsun:
+  if (qParts.length === 0) qParts.push("book");
+
+  const q = qParts.join("+");
+
+  const orderBy = sortOption === "year_desc" ? "newest" : "relevance";
+
+  const url =
+    `${GOOGLE_BOOKS_URL}/volumes?` +
+    `q=${encodeURIComponent(q)}` +
+    `&printType=books` +
+    `&langRestrict=tr` +
+    `&maxResults=${maxResults}` +
+    `&startIndex=${startIndex}` +
+    `&orderBy=${orderBy}` +
+    `&key=${GOOGLE_BOOKS_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok)
+      throw new Error(`Google Books Hatası: ${response.status}`);
+
+    const data = await response.json();
+    const items = data.items || [];
+
+    const mapped = items.map((item) =>
+      veriyiStandartFormataDonustur(item, "kitap")
+    );
+
+    // On yıla göre filtreleme (2010-2019 gibi)
+    if (!decadeStart) {
+      return mapped;
+    }
+
+    const endYear = decadeStart + 9;
+
+    const filtered = mapped.filter((kitap) => {
+      const yil = parseInt(kitap.yayin_yili, 10);
+      if (isNaN(yil)) return false;
+      return yil >= decadeStart && yil <= endYear;
+    });
+
+    return filtered;
+  } catch (error) {
+    console.error("Google Books Filtreli Arama Hatası:", error);
     throw error;
   }
 };
