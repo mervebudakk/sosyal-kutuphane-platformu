@@ -129,8 +129,8 @@ const ProfilSayfasi = () => {
 
                 {/* Kategori Sekmeleri */}
                 <div style={{ display: 'flex', gap: '15px', marginBottom: '40px', borderBottom: '1px solid #333', paddingBottom: '15px' }}>
-                    {[{ id: 'kitap', icon: BookOpen, label: 'Kitaplarım' }, { id: 'film', icon: Film, label: 'Filmlerim' }].map(k => {
-                        const aktif = aktifSekme === k.id;
+                    {[{ id: 'film', icon: Film, label: 'Filmlerim'} , { id: 'kitap', icon: BookOpen, label: 'Kitaplarım' }].map(k => {
+                        const aktif = aktifSekme === 'film';
                         return (
                             <button 
                                 key={k.id} 

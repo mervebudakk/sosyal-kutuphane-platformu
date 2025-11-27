@@ -1,33 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from './Servisler/supabaseServis'; 
-import { Home, Search, User, LogOut, BookOpen, Library } from 'lucide-react'; // Library ikonu eklendi
+import { Home, Search, User, LogOut, Library } from 'lucide-react'; // Library ikonu eklendi
 
 // Sayfalar
 import GirisKayit from './Sayfalar/GirisKayit.jsx'; 
 import AramaSayfasi from './Sayfalar/AramaSayfasi.jsx'; 
 import IcerikDetaySayfasi from './Sayfalar/IcerikDetaySayfasi.jsx';
 import ProfilSayfasi from './Sayfalar/ProfilSayfasi.jsx';
+import AnaSayfa from './Sayfalar/AnaSayfa.jsx';
 
-// Feed Bileşeni
-function AnaSayfaGoster() {
-    return (
-        <div style={{ textAlign: 'center', padding: '100px 20px', color: '#CCCCCC' }}>
-            <div style={{ 
-                background: '#1F1F1F', borderRadius: '50%', width: '80px', height: '80px', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
-                border: '2px solid #333'
-            }}>
-                <BookOpen size={40} color="#F5C518" />
-            </div>
-            <h2 style={{ color: 'white', fontSize: '2rem', marginBottom: '10px' }}>Sosyal Akış (Feed)</h2>
-            <p style={{ maxWidth: '500px', margin: '0 auto', lineHeight: '1.6' }}>
-                Takip ettiğin arkadaşların ne okuyor, ne izliyor? <br/>
-                <span style={{ color: '#F5C518' }}>(Yakında burada göreceksin)</span>
-            </p>
-        </div>
-    );
-}
 
 function App() {
     const [session, setSession] = useState(null);
@@ -125,7 +107,7 @@ function App() {
                     
                     <main>
                         <Routes>
-                            <Route path="/" element={<AnaSayfaGoster />} />
+                            <Route path="/" element={<AnaSayfa />} />
                             <Route path="/arama" element={<AramaSayfasi />} />
                             <Route path="/profil" element={<ProfilSayfasi />} />
                             <Route path="/icerik/:id" element={<IcerikDetaySayfasi />} />
