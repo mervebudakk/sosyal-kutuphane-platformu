@@ -360,140 +360,89 @@ const AramaSayfasi = () => {
           })}
         </div>
 
-        {/* Arama Kutusu */}
-        <div style={{ marginBottom: "20px" }}>
-          <div
-            style={{
-              background: "#1F1F1F",
-              padding: "8px",
-              borderRadius: "4px",
-              display: "flex",
-              alignItems: "center",
-              border: "1px solid #333",
-              maxWidth: "700px",
-              margin: "0 auto",
-            }}
-          >
-            <Search
-              size={24}
-              color="#F5C518"
-              style={{ marginLeft: "15px", marginRight: "15px" }}
-            />
-            <input
-              type="text"
-              value={aramaTerimi}
-              onChange={(e) => setAramaTerimi(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && aramaYap()}
-              placeholder={
-                aktifKategori === "film"
-                  ? "Matrix, Interstellar..."
-                  : "Harry Potter, 1984..."
-              }
-              style={{
-                flex: 1,
-                border: "none",
-                outline: "none",
-                fontSize: "1.1rem",
-                padding: "10px 0",
-                background: "transparent",
-                color: "white",
-              }}
-            />
-            <button
-              onClick={aramaYap}
-              disabled={yukleniyor}
-              style={{
-                background: "#F5C518",
-                color: "black",
-                border: "none",
-                borderRadius: "4px",
-                padding: "10px 30px",
-                fontSize: "1rem",
-                fontWeight: "bold",
-                cursor: yukleniyor ? "not-allowed" : "pointer",
-                opacity: yukleniyor ? 0.7 : 1,
-              }}
-            >
-              {yukleniyor ? <Loader size={20} /> : "Ara"}
-            </button>
-          </div>
-        </div>
+        {/* FİLTRE VE ARAMA KONTROL PANELİ */}
+                <div style={{ 
+                    background: "#1F1F1F", 
+                    borderRadius: "8px", 
+                    padding: "15px 20px", // Yüksekliği azaltmak için dikey padding azaldı
+                    border: "1px solid #333",
+                    maxWidth: "800px", 
+                    margin: "0 auto", 
+                    marginBottom: "40px" 
+                }}>
 
-        {/* Filtre Barı */}
-        <div
-          style={{
-            marginBottom: "30px",
-            padding: "12px 16px",
-            background: "#111111",
-            borderRadius: "8px",
-            border: "1px solid #333",
-            display: "flex",
-            flexDirection: "row", // Yan yana olması için row yapıyoruz
-            alignItems: "center",
-            flexWrap: "wrap", // Ekran küçülürse taşmayı önler
-            gap: "10px",
-          }}
-        >
-          {/* 1. Tür seçimi */}
-          <select
-            value={selectedGenre}
-            onChange={(e) => setSelectedGenre(e.target.value)}
-            style={{
-              padding: "8px 10px",
-              background: "#1F1F1F",
-              color: "#FFFFFF",
-              borderRadius: "6px",
-              border: "1px solid #444",
-              fontSize: "0.9rem",
-            }}
-          >
-            <option value="">Tür</option>
-            {aktifTurListesi.map((tur) => (
-              <option key={tur} value={tur}>
-                {tur}
-              </option>
-            ))}
-          </select>
+                    {/* 1. SATIR: FİLTRELEME ÇUBUĞU (Üstte yer almalı) */}
+                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '20px', borderBottom: '1px solid #333', paddingBottom: '15px' }}>
+                        
+                        <span style={{ color: '#F5C518', fontWeight: 'bold', fontSize: '0.9rem' }}>Filtrele:</span>
 
-          {/* 2. YIL (Onyıl) seçimi - Tür'ün hemen yanına ekledik */}
-          <select
-            value={selectedDecade}
-            onChange={(e) => setSelectedDecade(e.target.value)}
-            style={{
-              padding: "8px 10px",
-              background: "#1F1F1F",
-              color: "#FFFFFF",
-              borderRadius: "6px",
-              border: "1px solid #444",
-              fontSize: "0.9rem",
-            }}
-          >
-            {decadeOptions.map((d) => (
-              <option key={d.value || "hepsi"} value={d.value}>
-                {d.label}
-              </option>
-            ))}
-          </select>
+                        {/* Tür seçimi */}
+                        <select
+                            value={selectedGenre}
+                            onChange={(e) => setSelectedGenre(e.target.value)}
+                            style={{ padding: "6px 10px", background: "#111111", color: "white", borderRadius: "4px", border: "1px solid #444", fontSize: "0.9rem" }}
+                        >
+                            <option value="">Tür Seç</option>
+                            {aktifTurListesi.map((tur) => (<option key={tur} value={tur}>{tur}</option>))}
+                        </select>
 
-          {/* 3. Sıralama - marginLeft: 'auto' ile en sağa itiyoruz */}
-          <select
-            value={sortOption}
-            onChange={(e) => setSortOption(e.target.value)}
-            style={{
-              padding: "8px 10px",
-              background: "#1F1F1F",
-              color: "#FFFFFF",
-              borderRadius: "6px",
-              border: "1px solid #444",
-              fontSize: "0.9rem",
-              marginLeft: "auto", // Bu özellik sayesinde en sağa yapışır
-            }}
-          >
-            <option value="popularity_desc">Popülerlik</option>
-            <option value="rating_desc">Puan (yüksek → düşük)</option>
-            <option value="year_desc">Yıl (yeni → eski)</option>
-          </select>
-        </div>
+                        {/* YIL (Onyıl) seçimi */}
+                        <select
+                            value={selectedDecade}
+                            onChange={(e) => setSelectedDecade(e.target.value)}
+                            style={{ padding: "6px 10px", background: "#111111", color: "white", borderRadius: "4px", border: "1px solid #444", fontSize: "0.9rem" }}
+                        >
+                            {decadeOptions.map((d) => (<option key={d.value || "hepsi"} value={d.value}>{d.label}</option>))}
+                        </select>
+                        
+                        {/* Sıralama - En sağa itiyoruz */}
+                        <select
+                            value={sortOption}
+                            onChange={(e) => setSortOption(e.target.value)}
+                            style={{ padding: "6px 10px", background: "#111111", color: "white", borderRadius: "4px", border: "1px solid #444", fontSize: "0.9rem", marginLeft: "auto" }}
+                        >
+                            <option value="popularity_desc">Popülerlik</option>
+                            <option value="rating_desc">Puan (yüksek → düşük)</option>
+                            <option value="year_desc">Yıl (yeni → eski)</option>
+                        </select>
+                    </div>
+
+                    {/* 2. SATIR: ARAMA KUTUSU VE BUTON */}
+                    <div 
+                        style={{ 
+                            display: "flex", 
+                            alignItems: "center", 
+                            background: "#111111", 
+                            borderRadius: "4px", 
+                            border: "1px solid #333",
+                            height: '50px' // Kutu yüksekliğini sabitledik
+                        }}
+                    >
+                        <Search size={24} color="#F5C518" style={{ marginLeft: "15px", marginRight: "10px", flexShrink: 0 }} />
+                        <input
+                            type="text"
+                            value={aramaTerimi}
+                            onChange={(e) => setAramaTerimi(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && aramaYap()}
+                            placeholder={aktifKategori === "film" ? "Matrix, Interstellar..." : "Harry Potter, 1984..."}
+                            style={{ flex: 1, border: "none", outline: "none", fontSize: "1.1rem", padding: "10px 0", background: "transparent", color: "white" }}
+                        />
+                        <button
+                            onClick={aramaYap}
+                            disabled={yukleniyor}
+                            style={{
+                                background: "#F5C518", color: "black", border: "none", 
+                                borderRadius: "0 4px 4px 0",
+                                padding: "0 30px", // Dikey padding'i kaldırdık
+                                fontSize: "1rem", fontWeight: "bold", cursor: yukleniyor ? "not-allowed" : "pointer",
+                                opacity: yukleniyor ? 0.7 : 1, height: '100%',
+                            }}
+                        >
+                            {yukleniyor ? <Loader size={20} /> : "Ara"}
+                        </button>
+                    </div>
+
+                </div>
 
         {/* Hata Mesajı */}
         {hata && (
