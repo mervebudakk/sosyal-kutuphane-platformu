@@ -110,6 +110,7 @@ function App() {
                             <Route path="/" element={<AnaSayfa />} />
                             <Route path="/arama" element={<AramaSayfasi />} />
                             <Route path="/profil" element={<ProfilSayfasi />} />
+                            <Route path="/kullanici/:id" element={<ProfilSayfasi />} />
                             <Route path="/icerik/:id" element={<IcerikDetaySayfasi />} />
                         </Routes>
                     </main>
