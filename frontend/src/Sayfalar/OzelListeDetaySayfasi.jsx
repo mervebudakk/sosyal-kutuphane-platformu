@@ -17,7 +17,6 @@ const turFilter = searchParams.get("tur");
       setYukleniyor(true);
 
       try {
-        // Özel "Beğendiklerim" listesi
                 if (id === "begendiklerim") {
           const { data: authData, error: authErr } =
             await supabase.auth.getUser();
@@ -62,7 +61,6 @@ const turFilter = searchParams.get("tur");
               .map((b) => b.Icerikler)
               .filter(Boolean) || [];
 
-          // URL'deki ?tur=film/kitap filtresi
           if (turFilter === "film" || turFilter === "kitap") {
             icerikler = icerikler.filter(
               (ic) => ic.icerik_turu === turFilter
@@ -80,8 +78,6 @@ const turFilter = searchParams.get("tur");
           return;
         }
 
-
-        // Normal özel liste
         const { data, error } = await supabase
           .from("OzelListeler")
           .select(`

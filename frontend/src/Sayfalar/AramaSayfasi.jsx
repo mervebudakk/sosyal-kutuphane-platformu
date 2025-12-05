@@ -17,7 +17,6 @@ import {
   kitaplariFiltreyeGoreGetir,
 } from "../Servisler/apiServis";
 
-// TMDb genre id eşleştirmesi (Türkçe etiket → TMDb ID)
 const tmdbGenreMap = {
   Aksiyon: 28,
   Dram: 18,
@@ -49,7 +48,6 @@ const AramaSayfasi = () => {
   const [hasMore, setHasMore] = useState(true);
   const [aramaModu, setAramaModu] = useState(null);
 
-  // Filtre state'leri
   const [selectedGenre, setSelectedGenre] = useState("");
   const [selectedDecade, setSelectedDecade] = useState(""); // "2020", "2010" vb.
   const [sortOption, setSortOption] = useState("popularity_desc");
@@ -88,7 +86,6 @@ const AramaSayfasi = () => {
 
     const query = aramaTerimi.trim();
 
-    // İlk aramada her zaman 1. sayfadan başla
     setCurrentPage(1);
     setHasMore(true);
     setYukleniyor(true);
@@ -99,7 +96,6 @@ const AramaSayfasi = () => {
     try {
       let gelenSonuclar = [];
 
-      // 1) ARAMA MODU: kullanıcı bir şey yazdıysa → sadece başlığa göre arama
       if (query.length > 0) {
         setAramaModu("search");
 
@@ -109,7 +105,7 @@ const AramaSayfasi = () => {
           gelenSonuclar = await hariciKitaplariAra(query, 1);
         }
       }
-      // 2) FİLTRE MODU: arama terimi BOŞ ise → filtrelere göre listeleme
+
       else {
         setAramaModu("filter");
         if (aktifKategori === "film") {
@@ -138,7 +134,6 @@ const AramaSayfasi = () => {
             genreId
           );
         } else {
-          // ✅ Kitaplar için de filtre modu (Google Books)
           const decadeStart = selectedDecade
             ? parseInt(selectedDecade, 10)
             : null;
@@ -176,11 +171,10 @@ const AramaSayfasi = () => {
   };
 
   const dahaFazlaYukle = async () => {
-    if (yukleniyor) return; // Çifte tıklamayı engelle
+    if (yukleniyor) return; 
 
     const query = aramaTerimi.trim();
 
-    // Hiç arama yapılmadıysa veya mod belli değilse çalışmasın
     if (!aramaModu) return;
 
     const nextPage = currentPage + 1;
@@ -192,7 +186,6 @@ const AramaSayfasi = () => {
       let yeniSonuclar = [];
 
       if (aramaModu === "search") {
-        // ARAMA MODU (arama kutusuna yazılmış hali)
         if (query.length === 0) {
           setYukleniyor(false);
           return;
@@ -204,7 +197,6 @@ const AramaSayfasi = () => {
           yeniSonuclar = await hariciKitaplariAra(query, nextPage);
         }
       } else if (aramaModu === "filter") {
-        // FİLTRE MODU
 
         if (aktifKategori === "film") {
           const decadeStart = selectedDecade
@@ -243,7 +235,6 @@ const AramaSayfasi = () => {
         }
       }
 
-      // Yeni sayfada sonuç yoksa butonu gizle
       if (!yeniSonuclar || yeniSonuclar.length === 0) {
         setHasMore(false);
       } else {
@@ -364,7 +355,7 @@ const AramaSayfasi = () => {
                 <div style={{ 
                     background: "#1F1F1F", 
                     borderRadius: "8px", 
-                    padding: "15px 20px", // Yüksekliği azaltmak için dikey padding azaldı
+                    padding: "15px 20px", 
                     border: "1px solid #333",
                     maxWidth: "800px", 
                     margin: "0 auto", 

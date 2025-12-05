@@ -15,7 +15,6 @@ import { useNavigate } from "react-router-dom";
 
 const SAYFA_BOYUTU = 10;
 
-// Basit relatif zaman helper'ı
 const formatRelativeTime = (tarihStr) => {
   const tarih = new Date(tarihStr);
   const simdi = new Date();
@@ -34,7 +33,6 @@ const formatRelativeTime = (tarihStr) => {
   return tarih.toLocaleDateString("tr-TR");
 };
 
-// Aktivite türüne göre kart başlığı
 const aktiviteMetniOlustur = (aktivite, kullaniciAdi) => {
   const tur = aktivite.aktivite_turu; // 'puanlama' | 'yorum' | 'listeye_ekleme'
 
@@ -50,7 +48,6 @@ const aktiviteMetniOlustur = (aktivite, kullaniciAdi) => {
   return `${kullaniciAdi} bir aktivite gerçekleştirdi`;
 };
 
-// Tek bir aktivite kartı
 const AktiviteKarti = ({
   aktivite,
   currentUserId,
@@ -526,7 +523,6 @@ const AnaSayfa = () => {
   const [ilkYuklemeTamam, setIlkYuklemeTamam] = useState(false);
   const navigate = useNavigate();
 
-  // 1) Giriş yapan kullanıcının Kullanicilar kaydını bul
   useEffect(() => {
     const init = async () => {
       setYukleniyor(true);
@@ -558,7 +554,6 @@ const AnaSayfa = () => {
           dbUser.kullanici_adi || dbUser.eposta?.split("@")[0] || ""
         );
 
-        // İlk sayfa aktiviteleri
         await aktiviteleriGetir(dbUser.kullanici_id, 1, true);
         setSayfa(1);
         setIlkYuklemeTamam(true);
@@ -573,12 +568,10 @@ const AnaSayfa = () => {
     init();
   }, []);
 
-  // 2) Belirli sayfa için aktiviteleri getir
   const aktiviteleriGetir = async (kullaniciId, sayfaNo, replace) => {
     const offset = (sayfaNo - 1) * SAYFA_BOYUTU;
     const limit = SAYFA_BOYUTU;
 
-    // Takip edilen kullanıcıları bul
     const { data: takipData, error: takipErr } = await supabase
       .from("TakipEtmeler")
       .select("takip_edilen_id")
@@ -589,7 +582,6 @@ const AnaSayfa = () => {
     const takipEdilenIds = takipData?.map((t) => t.takip_edilen_id) || [];
     const idListesi = [kullaniciId, ...takipEdilenIds];
 
-    // AnaSayfa.jsx içinde aktiviteleriGetir fonksiyonu
     const { data: aktiviteData, error: aktErr } = await supabase
       .from("Aktiviteler")
       .select(
@@ -627,12 +619,10 @@ const AnaSayfa = () => {
     );
   };
 
-  // 3) Beğeni toggle
   const handleLikeToggle = async (aktivite, isLiked) => {
     if (!currentUserId) return;
     try {
       if (isLiked) {
-        // Beğeniyi sil
         const { error } = await supabase
           .from("AktiviteBegenileri")
           .delete()
@@ -640,7 +630,6 @@ const AnaSayfa = () => {
           .eq("kullanici_id", currentUserId);
         if (error) throw error;
       } else {
-        // Yeni beğeni ekle
         const { error } = await supabase.from("AktiviteBegenileri").insert([
           {
             aktivite_id: aktivite.aktivite_id,
@@ -650,7 +639,6 @@ const AnaSayfa = () => {
         if (error) throw error;
       }
 
-      // Local state'i güncelle
       setAktiviteler((prev) =>
         prev.map((a) => {
           if (a.aktivite_id !== aktivite.aktivite_id) return a;
@@ -676,7 +664,6 @@ const AnaSayfa = () => {
     }
   };
 
-  // 4) Aktiviteye yorum ekleme
   const handleCommentSend = async (aktivite, yorumMetni) => {
     if (!currentUserId) return;
 
@@ -702,14 +689,12 @@ const AnaSayfa = () => {
 
       if (error) throw error;
 
-      // Local state’i güncelle (akışta anında görünsün)
       setAktiviteler((prev) =>
         prev.map((a) => {
           if (a.aktivite_id !== aktivite.aktivite_id) return a;
 
           const mevcutYorumlar = a.AktiviteYorumlari || [];
 
-          // Eğer select’ten data gelmezse yedek olarak kendimiz obje kur
           const yeniYorum = data || {
             aktivite_yorum_id: Date.now(),
             yorum_metin: yorumMetni,
@@ -740,11 +725,10 @@ const AnaSayfa = () => {
         .from("AktiviteYorumlari")
         .update({ yorum_metin: yeniMetin })
         .eq("aktivite_yorum_id", yorumId)
-        .eq("kullanici_id", currentUserId); // sadece kendi yorumunu güncellesin
+        .eq("kullanici_id", currentUserId); 
 
       if (error) throw error;
 
-      // Local state'i güncelle
       setAktiviteler((prev) =>
         prev.map((a) => {
           if (a.aktivite_id !== aktiviteId) return a;
@@ -775,7 +759,7 @@ const AnaSayfa = () => {
         .from("AktiviteYorumlari")
         .delete()
         .eq("aktivite_yorum_id", yorumId)
-        .eq("kullanici_id", currentUserId); // güvenlik için
+        .eq("kullanici_id", currentUserId); 
 
       if (error) throw error;
 
@@ -811,8 +795,6 @@ const AnaSayfa = () => {
       setYukleniyor(false);
     }
   };
-
-  // ---- RENDER ----
 
   if (!ilkYuklemeTamam && yukleniyor) {
     return (

@@ -24,11 +24,10 @@ const IcerikDetaySayfasi = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // İçerik State'leri
   const [icerik, setIcerik] = useState(null);
   const [yukleniyor, setYukleniyor] = useState(true);
 
-  // Kullanıcı Etkileşim State'leri
+
   const [mevcutDurum, setMevcutDurum] = useState(null);
   const [kullaniciPuani, setKullaniciPuani] = useState(0);
   const [hoverPuan, setHoverPuan] = useState(0);
@@ -40,7 +39,6 @@ const IcerikDetaySayfasi = () => {
   const [ozelListeYukleniyor, setOzelListeYukleniyor] = useState(false);
   const [yeniListeAdi, setYeniListeAdi] = useState("");
 
-  // Yorum State'leri
   const [yorumlar, setYorumlar] = useState([]);
   const [yeniYorum, setYeniYorum] = useState("");
   const [yorumYukleniyor, setYorumYukleniyor] = useState(false);
@@ -51,8 +49,6 @@ const IcerikDetaySayfasi = () => {
   const [yorumIslemYukleniyor, setYorumIslemYukleniyor] = useState(false);
 
   // --- FONKSİYONLAR ---
-
-  // Yardımcı: Gerçek Kullanıcı ID'sini bul
   const getDbUserId = async () => {
     const {
       data: { user },
@@ -63,7 +59,6 @@ const IcerikDetaySayfasi = () => {
       return null;
     }
 
-    // E-posta üzerinden custom Kullanicilar tablosundaki ID'yi bul
     const { data: dbUser } = await supabase
       .from("Kullanicilar")
       .select("kullanici_id")
@@ -78,14 +73,12 @@ const IcerikDetaySayfasi = () => {
     return null;
   };
 
-  // Kullanıcının özel listelerini ve bu içeriğin hangi listelerde olduğunu hazırla
   const ozelListeleriHazirla = async () => {
     const userId = await getDbUserId();
     if (!userId || !icerik) return;
 
     setOzelListeYukleniyor(true);
     try {
-      // 1) Kullanıcının tüm özel listeleri
       const { data: listData, error: listErr } = await supabase
         .from("OzelListeler")
         .select("liste_id, liste_adi")
@@ -95,7 +88,6 @@ const IcerikDetaySayfasi = () => {
       if (listErr) throw listErr;
       setOzelListeler(listData || []);
 
-      // 2) Bu içerik hangi listelerde var?
       const { data: bagData, error: bagErr } = await supabase
         .from("OzelListeIcerikleri")
         .select("liste_id")
@@ -115,7 +107,6 @@ const IcerikDetaySayfasi = () => {
     }
   };
 
-  // İçeriği listeye ekle / listeden çıkar
   const handleListeToggle = async (listeId) => {
     const userId = await getDbUserId();
     if (!userId || !icerik) return;
@@ -124,7 +115,6 @@ const IcerikDetaySayfasi = () => {
 
     try {
       if (already) {
-        // Listeden çıkar
         const { error } = await supabase
           .from("OzelListeIcerikleri")
           .delete()
@@ -134,7 +124,6 @@ const IcerikDetaySayfasi = () => {
         if (error) throw error;
         setSeciliListeler((prev) => prev.filter((id) => id !== listeId));
       } else {
-        // Listeye ekle
         const { error } = await supabase.from("OzelListeIcerikleri").insert([
           {
             liste_id: listeId,
@@ -150,7 +139,6 @@ const IcerikDetaySayfasi = () => {
     }
   };
 
-  // Modal içinden yeni özel liste oluşturma
   const handleYeniListeOlustur = async () => {
     const ad = yeniListeAdi.trim();
     if (!ad) return;
@@ -167,7 +155,6 @@ const IcerikDetaySayfasi = () => {
 
       if (error) throw error;
 
-      // Yeni listeyi liste dizisine ekle
       setOzelListeler((prev) => [...prev, data]);
       setYeniListeAdi("");
     } catch (e) {
@@ -176,7 +163,6 @@ const IcerikDetaySayfasi = () => {
     }
   };
 
-  // 1. Durum Güncelleme (Okudum/İzledim)
   const durumGuncelle = async (yeniDurum) => {
     const userId = await getDbUserId();
     if (!userId) return;
@@ -196,12 +182,10 @@ const IcerikDetaySayfasi = () => {
     }
   };
 
-  // 2. Puan Verme
   const puanVer = async (puan) => {
     const userId = await getDbUserId();
     if (!userId || !icerik) return;
 
-    // 1) Kullanıcının puanını kaydet
     const { error } = await supabase.from("KullaniciPuanlari").upsert(
       {
         kullanici_id: userId,
@@ -217,10 +201,8 @@ const IcerikDetaySayfasi = () => {
       return;
     }
 
-    // Kullanıcının kendi puanını hemen UI'da güncelle
     setKullaniciPuani(puan);
 
-    // 2) Trigger çalıştıktan sonra güncel istatistikleri DB'den çek
     const { data: istatData, error: istatErr } = await supabase
       .from("IcerikIstatistikleri")
       .select("ortalama_puan, toplam_oy_sayisi")
@@ -228,7 +210,6 @@ const IcerikDetaySayfasi = () => {
       .single();
 
     if (!istatErr && istatData) {
-      // 3) İçerik state'inin içindeki IcerikIstatistikleri'ni güncelle
       setIcerik((prev) => {
         if (!prev) return prev;
 
@@ -252,13 +233,11 @@ const IcerikDetaySayfasi = () => {
     alert(`⭐ Puanınız (${puan}/10) başarıyla kaydedildi!`);
   };
 
-  // İçeriği beğen / beğenmekten vazgeç
   const icerikBegeniToggle = async () => {
     const userId = await getDbUserId();
     if (!userId || !icerik) return;
 
     if (begenildi) {
-      // Beğeniyi kaldır
       const { error } = await supabase
         .from("IcerikBegenileri")
         .delete()
@@ -273,7 +252,6 @@ const IcerikDetaySayfasi = () => {
 
       setBegenildi(false);
     } else {
-      // Beğen
       const { error } = await supabase.from("IcerikBegenileri").insert([
         {
           kullanici_id: userId,
@@ -281,7 +259,6 @@ const IcerikDetaySayfasi = () => {
         },
       ]);
 
-      // UNIQUE ihlali olursa (zaten beğenmişse) sessizce true yap
       if (error) {
         if (error.code === "23505") {
           setBegenildi(true);
@@ -296,7 +273,6 @@ const IcerikDetaySayfasi = () => {
     }
   };
 
-  // 3. Yorum Gönderme
   const yorumGonder = async () => {
     if (!yeniYorum.trim()) return;
     setYorumYukleniyor(true);
@@ -324,7 +300,6 @@ const IcerikDetaySayfasi = () => {
     if (error) {
       alert("Yorum gönderilemedi.");
     } else {
-      // Yeni yorumu listeye başa ekle
       setYorumlar((onceki) => [data, ...onceki]);
       setYeniYorum("");
     }
@@ -332,7 +307,6 @@ const IcerikDetaySayfasi = () => {
     setYorumYukleniyor(false);
   };
 
-  // Mevcut yorumu güncelle
   const yorumGuncelle = async (yorumId) => {
     if (!duzenlemeMetni.trim()) return;
 
@@ -370,7 +344,6 @@ const IcerikDetaySayfasi = () => {
     setYorumIslemYukleniyor(false);
   };
 
-  // Yorumu sil
   const yorumSil = async (yorumId) => {
     const onay = window.confirm("Yorumu silmek istediğine emin misin?");
     if (!onay) return;
@@ -398,7 +371,6 @@ const IcerikDetaySayfasi = () => {
     setYorumIslemYukleniyor(false);
   };
 
-  // Yorumu beğen / beğenmekten vazgeç
   const yorumBegeniToggle = async (yorum) => {
     const userId = await getDbUserId();
     if (!userId) return;
@@ -407,7 +379,6 @@ const IcerikDetaySayfasi = () => {
       yorum.YorumBegenileri?.some((b) => b.kullanici_id === userId) || false;
 
     if (zatenBegendim) {
-      // Beğeniyi geri al
       const { error } = await supabase
         .from("YorumBegenileri")
         .delete()
@@ -432,7 +403,6 @@ const IcerikDetaySayfasi = () => {
         )
       );
     } else {
-      // Beğen
       const { error } = await supabase
         .from("YorumBegenileri")
         .insert([{ yorum_id: yorum.yorum_id, kullanici_id: userId }]);
@@ -458,7 +428,6 @@ const IcerikDetaySayfasi = () => {
     }
   };
 
-  // 4. VERİ ÇEKME (useEffect)
   useEffect(() => {
     const veriGetir = async () => {
       const { data: icerikData, error } = await supabase

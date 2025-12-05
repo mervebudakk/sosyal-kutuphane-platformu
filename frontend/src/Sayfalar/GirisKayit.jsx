@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { User, Mail, Lock, Eye, EyeOff, KeyRound, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../Servisler/supabaseServis';
 
-// Ortak input bileşeni (component DIŞINDA, her render'da yeniden tanımlanmasın)
 const InputField = ({
   icon: Icon,
   type = 'text',
@@ -77,7 +76,6 @@ const GirisKayit = () => {
   const [message, setMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // GİRİŞ
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -90,7 +88,6 @@ const GirisKayit = () => {
     setLoading(false);
   };
 
-  // KAYIT
   const handleSignUp = async (e) => {
     e.preventDefault();
     setLoading(true);

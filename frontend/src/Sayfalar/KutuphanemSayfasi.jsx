@@ -22,19 +22,16 @@ const KutuphanemSayfasi = () => {
   const [begendiklerim, setBegendiklerim] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
 
-  // SADECE KENDİ KÜTÜPHANEMİ GETİR
   useEffect(() => {
     const veriGetir = async () => {
       setYukleniyor(true);
 
-      // 1) Auth kullanıcısını al
       const { data: authData, error: authErr } = await supabase.auth.getUser();
       if (authErr || !authData?.user) {
         navigate("/");
         return;
       }
 
-      // 2) Auth kullanıcısının Kullanicilar kaydı
       const { data: dbCurrentUser, error: dbErr } = await supabase
         .from("Kullanicilar")
         .select("kullanici_id")
@@ -49,7 +46,6 @@ const KutuphanemSayfasi = () => {
       const kullaniciId = dbCurrentUser.kullanici_id;
       setAktifKullaniciId(kullaniciId);
 
-      // 3) Kütüphane verileri
       const { data: durumlar, error: durumErr } = await supabase
         .from("KullaniciIcerikDurumlari")
         .select("durum, Icerikler(*)")
@@ -84,7 +80,6 @@ const KutuphanemSayfasi = () => {
         });
       }
 
-      // 4) Özel listeler
       const { data: ozelListeData, error: ozelErr } = await supabase
         .from("OzelListeler")
         .select(
@@ -119,7 +114,6 @@ const KutuphanemSayfasi = () => {
         );
       }
 
-            // 5) Beğendiğim içerikler (IcerikBegenileri'nden)
       const { data: begeniData, error: begeniErr } = await supabase
         .from("IcerikBegenileri")
         .select(
@@ -151,7 +145,6 @@ const KutuphanemSayfasi = () => {
     veriGetir();
   }, [navigate]);
 
-  // Yardımcı bileşenler (aynen bırakıyoruz)
   const IcerikKarti = ({ icerik }) => (
     <div
       onClick={() => navigate(`/icerik/${icerik.icerik_id}`)}
@@ -271,7 +264,6 @@ const KutuphanemSayfasi = () => {
 
   const handleClick = () => {
     if (otomatikBegeniListesi) {
-      // Film / kitap sekmesine göre detay sayfasına git
       navigate(`/ozel-liste/begendiklerim?tur=${aktifTur}`);
     } else {
       navigate(`/ozel-liste/${liste.liste_id}`);

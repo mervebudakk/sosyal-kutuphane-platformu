@@ -3,7 +3,6 @@ import { UserPlus, UserCheck, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../Servisler/supabaseServis";
 
-// Basit relatif zaman helper'ı
 const formatRelativeTime = (tarihStr) => {
   if (!tarihStr) return "";
   const tarih = new Date(tarihStr);
@@ -23,7 +22,6 @@ const formatRelativeTime = (tarihStr) => {
   return tarih.toLocaleDateString("tr-TR");
 };
 
-// Aktivite türünü açıklama metnine çeviren helper
 const aktiviteAciklama = (aktiviteTuru) => {
   switch (aktiviteTuru) {
     case "yorum":
@@ -42,28 +40,25 @@ const aktiviteAciklama = (aktiviteTuru) => {
 
 const ProfilSayfasi = () => {
   const navigate = useNavigate();
-  const { id: profilIdParam } = useParams(); // /kullanici/:id için
+  const { id: profilIdParam } = useParams(); 
 
-  const [kullanici, setKullanici] = useState(null); // Görüntülenen profil
-  const [aktifKullaniciId, setAktifKullaniciId] = useState(null); // Giriş yapan
+  const [kullanici, setKullanici] = useState(null); 
+  const [aktifKullaniciId, setAktifKullaniciId] = useState(null); 
   const [benimProfilimMi, setBenimProfilimMi] = useState(true);
   const [takipEdiliyor, setTakipEdiliyor] = useState(false);
   const [takipYukleniyor, setTakipYukleniyor] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(true);
 
-  // Takipçi / takip edilen sayıları
   const [takipciSayisi, setTakipciSayisi] = useState(0);
   const [takipEdilenSayisi, setTakipEdilenSayisi] = useState(0);
 
-  // Takip listesi modali
   const [listeModalAcik, setListeModalAcik] = useState(false);
-  const [listeModalTip, setListeModalTip] = useState(null); // "takipci" | "takipEdilen"
+  const [listeModalTip, setListeModalTip] = useState(null); 
   const [listeModalYukleniyor, setListeModalYukleniyor] = useState(false);
   const [listeModalKullanicilar, setListeModalKullanicilar] = useState([]);
 
-  // Alt sekmeler: Yorumlarım / Beğenilerim / Puanlarım
-  // null = hiçbir sekme seçili değil, sadece Son Aktiviteler görünsün
-  const [aktifAltSekme, setAktifAltSekme] = useState(null); // "yorumlar" | "begeniler" | "puanlar" | null
+
+  const [aktifAltSekme, setAktifAltSekme] = useState(null); 
 
   const [yorumlarim, setYorumlarim] = useState([]);
   const [yorumlarYukleniyor, setYorumlarYukleniyor] = useState(false);
@@ -74,23 +69,18 @@ const ProfilSayfasi = () => {
   const [puanlarim, setPuanlarim] = useState([]);
   const [puanlarYukleniyor, setPuanlarYukleniyor] = useState(false);
 
-  // Son aktiviteler (hem kendi profilinde hem başkasında gösterilecek)
+
   const [sonAktiviteler, setSonAktiviteler] = useState([]);
   const [sonAktivitelerYukleniyor, setSonAktivitelerYukleniyor] =
     useState(false);
 
-  // Yorum düzenleme state'leri
   const [duzenlenenYorumId, setDuzenlenenYorumId] = useState(null);
   const [duzenlemeMetni, setDuzenlemeMetni] = useState("");
   const [duzenlemeYukleniyor, setDuzenlemeYukleniyor] = useState(false);
 
-  // Puan düzenleme state'i (hangi içerik güncelleniyor)
   const [puanDuzenlemeYukleniyorId, setPuanDuzenlemeYukleniyorId] =
     useState(null);
 
-  // --- Yardımcı fetch fonksiyonları ---
-
-  // Kullanıcının içerik yorumlarını getir (KullaniciYorumlari)
   const yorumlariGetir = async (hedefKullaniciId) => {
     setYorumlarYukleniyor(true);
     try {
@@ -123,7 +113,6 @@ const ProfilSayfasi = () => {
     }
   };
 
-  // Kullanıcının beğendiği aktiviteleri getir (AktiviteBegenileri)
   const begenileriGetir = async (hedefKullaniciId) => {
     setBegenilerYukleniyor(true);
     try {
@@ -162,7 +151,6 @@ const ProfilSayfasi = () => {
     }
   };
 
-  // Kullanıcının verdiği puanları getir (KullaniciPuanlari)
   const puanlariGetir = async (hedefKullaniciId) => {
     setPuanlarYukleniyor(true);
     try {
@@ -194,7 +182,6 @@ const ProfilSayfasi = () => {
     }
   };
 
-  // Profil sahibinin son aktivitelerini getir (Aktiviteler)
   const sonAktiviteleriGetir = async (hedefKullaniciId) => {
     setSonAktivitelerYukleniyor(true);
     try {
@@ -229,14 +216,12 @@ const ProfilSayfasi = () => {
     const veriGetir = async () => {
       setYukleniyor(true);
 
-      // 1) Auth user
       const { data: authData, error: authErr } = await supabase.auth.getUser();
       if (authErr || !authData?.user) {
         navigate("/");
         return;
       }
 
-      // 2) Giriş yapan kullanıcının Kullanicilar kaydı
       const { data: dbCurrentUser, error: dbErr } = await supabase
         .from("Kullanicilar")
         .select("*")
@@ -250,12 +235,10 @@ const ProfilSayfasi = () => {
 
       setAktifKullaniciId(dbCurrentUser.kullanici_id);
 
-      // 3) Hangi profil görüntüleniyor?
       const hedefKullaniciId = profilIdParam || dbCurrentUser.kullanici_id;
       const kendiProfiliMi = hedefKullaniciId === dbCurrentUser.kullanici_id;
       setBenimProfilimMi(kendiProfiliMi);
 
-      // 4) Profil sahibini getir
       const { data: profilUser, error: profilErr } = await supabase
         .from("Kullanicilar")
         .select("*")
@@ -273,7 +256,6 @@ const ProfilSayfasi = () => {
         email: profilUser.eposta,
       });
 
-      // 5) Takipçi ve takip edilen sayıları
       const { data: takipciler, error: takipciErr } = await supabase
         .from("TakipEtmeler")
         .select("takip_eden_id, takip_edilen_id")
@@ -296,7 +278,6 @@ const ProfilSayfasi = () => {
         setTakipEdilenSayisi(0);
       }
 
-      // 6) Takip durumu (başkasının profili ise)
       if (!kendiProfiliMi) {
         const { data: takipData, error: takipErr } = await supabase
           .from("TakipEtmeler")
@@ -313,14 +294,12 @@ const ProfilSayfasi = () => {
         setTakipEdiliyor(false);
       }
 
-      // 7) Alt sekmeler için veri
       await yorumlariGetir(hedefKullaniciId);
       if (kendiProfiliMi) {
         await begenileriGetir(hedefKullaniciId);
         await puanlariGetir(hedefKullaniciId);
       }
 
-      // 8) Son aktiviteleri getir (her profil için)
       await sonAktiviteleriGetir(hedefKullaniciId);
 
       setYukleniyor(false);
@@ -329,7 +308,6 @@ const ProfilSayfasi = () => {
     veriGetir();
   }, [navigate, profilIdParam]);
 
-  // Takipçi / takip edilen listesi modalını aç
   const takipListesiniAc = async (tip) => {
     if (!kullanici) return;
 
@@ -343,13 +321,12 @@ const ProfilSayfasi = () => {
 
       let takipSorgu;
       if (tip === "takipci") {
-        // Bu kullanıcıyı takip edenler
         takipSorgu = await supabase
           .from("TakipEtmeler")
           .select("takip_eden_id")
           .eq("takip_edilen_id", hedefId);
       } else {
-        // Bu kullanıcının takip ettikleri
+
         takipSorgu = await supabase
           .from("TakipEtmeler")
           .select("takip_edilen_id")
@@ -392,7 +369,6 @@ const ProfilSayfasi = () => {
     setTakipYukleniyor(true);
     try {
       if (takipEdiliyor) {
-        // Takipten çık
         await supabase
           .from("TakipEtmeler")
           .delete()
@@ -402,7 +378,6 @@ const ProfilSayfasi = () => {
         setTakipEdiliyor(false);
         setTakipciSayisi((onceki) => Math.max(0, onceki - 1));
       } else {
-        // Takip et
         const { error } = await supabase.from("TakipEtmeler").insert([
           {
             takip_eden_id: aktifKullaniciId,
@@ -422,7 +397,6 @@ const ProfilSayfasi = () => {
     }
   };
 
-  // Yorum güncelle
   const yorumGuncelle = async (yorumId, yeniMetin) => {
     if (!aktifKullaniciId || !benimProfilimMi) return;
     if (!yeniMetin.trim()) return;
@@ -454,7 +428,6 @@ const ProfilSayfasi = () => {
     }
   };
 
-  // Yorum sil
   const yorumSil = async (yorumId) => {
     if (!aktifKullaniciId || !benimProfilimMi) return;
 
@@ -477,7 +450,6 @@ const ProfilSayfasi = () => {
     }
   };
 
-  // Beğeniyi kaldır (Aktivite beğenisi)
   const begeniyiKaldir = async (aktiviteId) => {
     if (!aktifKullaniciId || !benimProfilimMi) return;
 
@@ -499,7 +471,6 @@ const ProfilSayfasi = () => {
     }
   };
 
-  // Puan güncelle (Puanlarım sekmesinde dropdown değiştiğinde)
   const puanGuncelle = async (icerikId, yeniPuanStr) => {
     if (!aktifKullaniciId || !benimProfilimMi) return;
     const yeniPuan = Number(yeniPuanStr);
