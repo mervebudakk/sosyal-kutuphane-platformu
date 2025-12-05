@@ -15,6 +15,7 @@ import {
   Share2,
   Send,
   User,
+  Tag,
   ListPlus,
   X,
 } from "lucide-react";
@@ -198,8 +199,9 @@ const IcerikDetaySayfasi = () => {
   // 2. Puan Verme
   const puanVer = async (puan) => {
     const userId = await getDbUserId();
-    if (!userId) return;
+    if (!userId || !icerik) return;
 
+    // 1) Kullanıcının puanını kaydet
     const { error } = await supabase.from("KullaniciPuanlari").upsert(
       {
         kullanici_id: userId,
@@ -209,9 +211,88 @@ const IcerikDetaySayfasi = () => {
       { onConflict: "kullanici_id, icerik_id" }
     );
 
-    if (!error) {
-      setKullaniciPuani(puan);
-      alert(`⭐ Puanınız (${puan}/10) başarıyla kaydedildi!`);
+    if (error) {
+      console.error(error);
+      alert("Puan kaydedilirken bir hata oluştu.");
+      return;
+    }
+
+    // Kullanıcının kendi puanını hemen UI'da güncelle
+    setKullaniciPuani(puan);
+
+    // 2) Trigger çalıştıktan sonra güncel istatistikleri DB'den çek
+    const { data: istatData, error: istatErr } = await supabase
+      .from("IcerikIstatistikleri")
+      .select("ortalama_puan, toplam_oy_sayisi")
+      .eq("icerik_id", icerik.icerik_id)
+      .single();
+
+    if (!istatErr && istatData) {
+      // 3) İçerik state'inin içindeki IcerikIstatistikleri'ni güncelle
+      setIcerik((prev) => {
+        if (!prev) return prev;
+
+        const oncekiIstat = Array.isArray(prev.IcerikIstatistikleri)
+          ? prev.IcerikIstatistikleri[0] || {}
+          : prev.IcerikIstatistikleri || {};
+
+        return {
+          ...prev,
+          IcerikIstatistikleri: [
+            {
+              ...oncekiIstat,
+              ortalama_puan: istatData.ortalama_puan,
+              toplam_oy_sayisi: istatData.toplam_oy_sayisi,
+            },
+          ],
+        };
+      });
+    }
+
+    alert(`⭐ Puanınız (${puan}/10) başarıyla kaydedildi!`);
+  };
+
+  // İçeriği beğen / beğenmekten vazgeç
+  const icerikBegeniToggle = async () => {
+    const userId = await getDbUserId();
+    if (!userId || !icerik) return;
+
+    if (begenildi) {
+      // Beğeniyi kaldır
+      const { error } = await supabase
+        .from("IcerikBegenileri")
+        .delete()
+        .eq("kullanici_id", userId)
+        .eq("icerik_id", icerik.icerik_id);
+
+      if (error) {
+        console.error(error);
+        alert("Beğeni kaldırılamadı.");
+        return;
+      }
+
+      setBegenildi(false);
+    } else {
+      // Beğen
+      const { error } = await supabase.from("IcerikBegenileri").insert([
+        {
+          kullanici_id: userId,
+          icerik_id: icerik.icerik_id,
+        },
+      ]);
+
+      // UNIQUE ihlali olursa (zaten beğenmişse) sessizce true yap
+      if (error) {
+        if (error.code === "23505") {
+          setBegenildi(true);
+          return;
+        }
+        console.error(error);
+        alert("Beğeni kaydedilemedi.");
+        return;
+      }
+
+      setBegenildi(true);
     }
   };
 
@@ -407,6 +488,18 @@ const IcerikDetaySayfasi = () => {
             .single();
 
           if (puanData) setKullaniciPuani(puanData.puan_degeri);
+
+          const { data: begeniData, error: begeniErr } = await supabase
+            .from("IcerikBegenileri")
+            .select("begeni_id")
+            .eq("kullanici_id", userDbId)
+            .eq("icerik_id", id);
+
+          if (!begeniErr && begeniData && begeniData.length > 0) {
+            setBegenildi(true);
+          } else {
+            setBegenildi(false);
+          }
         }
       }
 
@@ -616,7 +709,7 @@ const IcerikDetaySayfasi = () => {
 
               <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                 <button
-                  onClick={() => setBegenildi(!begenildi)}
+                  onClick={icerikBegeniToggle}
                   style={{
                     flex: 1,
                     background: begenildi
@@ -637,6 +730,7 @@ const IcerikDetaySayfasi = () => {
                 >
                   <Heart size={20} fill={begenildi ? "#ef4444" : "none"} />
                 </button>
+
                 <button
                   style={{
                     flex: 1,
@@ -693,6 +787,28 @@ const IcerikDetaySayfasi = () => {
                 <Clock size={16} color="#F5C518" /> {icerik.sure_sayfa_sayisi}{" "}
                 {icerik.icerik_turu === "film" ? "dk" : "sayfa"}
               </span>
+              {icerik.yazar_yonetmen && (
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <User size={16} color="#F5C518" /> {icerik.yazar_yonetmen}
+                </span>
+              )}
+              {icerik.turler && (
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <Tag size={16} color="#F5C518" /> {icerik.turler}
+                </span>
+              )}
               {icerik.icerik_turu === "film" ? (
                 <Film size={20} color="#F5C518" />
               ) : (
@@ -1086,40 +1202,41 @@ const IcerikDetaySayfasi = () => {
                         )}
 
                         {/* Alt satır: Beğeni butonu (sadece başkasının yorumlarında) */}
-{!benimYorumum && (
-  <div
-    style={{
-      marginTop: "10px",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-    }}
-  >
-    <button
-      onClick={() => yorumBegeniToggle(yorum)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "4px 10px",
-        borderRadius: "999px",
-        border: "1px solid #333",
-        background: benBegendim ? "rgba(239,68,68,0.12)" : "#151515",
-        color: benBegendim ? "#ef4444" : "#CCCCCC",
-        cursor: "pointer",
-        fontSize: "0.8rem",
-      }}
-    >
-      <Heart
-        size={16}
-        fill={benBegendim ? "#ef4444" : "none"}
-        color={benBegendim ? "#ef4444" : "#CCCCCC"}
-      />
-      <span>{begeniSayisi}</span>
-    </button>
-  </div>
-)}
-
+                        {!benimYorumum && (
+                          <div
+                            style={{
+                              marginTop: "10px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <button
+                              onClick={() => yorumBegeniToggle(yorum)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                padding: "4px 10px",
+                                borderRadius: "999px",
+                                border: "1px solid #333",
+                                background: benBegendim
+                                  ? "rgba(239,68,68,0.12)"
+                                  : "#151515",
+                                color: benBegendim ? "#ef4444" : "#CCCCCC",
+                                cursor: "pointer",
+                                fontSize: "0.8rem",
+                              }}
+                            >
+                              <Heart
+                                size={16}
+                                fill={benBegendim ? "#ef4444" : "none"}
+                                color={benBegendim ? "#ef4444" : "#CCCCCC"}
+                              />
+                              <span>{begeniSayisi}</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })

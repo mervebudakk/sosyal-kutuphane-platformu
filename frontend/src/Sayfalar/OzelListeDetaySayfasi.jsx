@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../Servisler/supabaseServis";
 import { ArrowLeft, Film, BookOpen } from "lucide-react";
 
@@ -8,53 +8,128 @@ const OzelListeDetaySayfasi = () => {
   const navigate = useNavigate();
   const [liste, setListe] = useState(null);
   const [yukleniyor, setYukleniyor] = useState(true);
+  const location = useLocation();
+const searchParams = new URLSearchParams(location.search);
+const turFilter = searchParams.get("tur");
 
-  useEffect(() => {
+    useEffect(() => {
     const getir = async () => {
       setYukleniyor(true);
-      const { data, error } = await supabase
-        .from("OzelListeler")
-        .select(`
-          liste_id,
-          liste_adi,
-          aciklama,
-          Kullanicilar ( kullanici_adi ),
-          OzelListeIcerikleri (
-            Icerikler (
+
+      try {
+        // Özel "Beğendiklerim" listesi
+                if (id === "begendiklerim") {
+          const { data: authData, error: authErr } =
+            await supabase.auth.getUser();
+          if (authErr || !authData?.user) {
+            navigate("/");
+            return;
+          }
+
+          const { data: dbUser, error: dbErr } = await supabase
+            .from("Kullanicilar")
+            .select("kullanici_id, kullanici_adi")
+            .eq("kullanici_id", authData.user.id)
+            .single();
+
+          if (dbErr || !dbUser) {
+            navigate("/");
+            return;
+          }
+
+          const { data: begeniData, error: begeniErr } = await supabase
+            .from("IcerikBegenileri")
+            .select(`
               icerik_id,
-              baslik,
-              kapak_url,
-              icerik_turu,
-              yayin_yili
+              Icerikler (
+                icerik_id,
+                baslik,
+                kapak_url,
+                icerik_turu,
+                yayin_yili
+              )
+            `)
+            .eq("kullanici_id", dbUser.kullanici_id);
+
+          if (begeniErr) {
+            console.error(begeniErr);
+            setYukleniyor(false);
+            return;
+          }
+
+          let icerikler =
+            (begeniData || [])
+              .map((b) => b.Icerikler)
+              .filter(Boolean) || [];
+
+          // URL'deki ?tur=film/kitap filtresi
+          if (turFilter === "film" || turFilter === "kitap") {
+            icerikler = icerikler.filter(
+              (ic) => ic.icerik_turu === turFilter
+            );
+          }
+
+          setListe({
+            liste_id: "begendiklerim",
+            liste_adi: "Beğendiklerim",
+            aciklama: "Beğendiğin film ve kitapların listesi.",
+            sahibi: dbUser.kullanici_adi || "",
+            icerikler,
+          });
+          setYukleniyor(false);
+          return;
+        }
+
+
+        // Normal özel liste
+        const { data, error } = await supabase
+          .from("OzelListeler")
+          .select(`
+            liste_id,
+            liste_adi,
+            aciklama,
+            Kullanicilar ( kullanici_adi ),
+            OzelListeIcerikleri (
+              Icerikler (
+                icerik_id,
+                baslik,
+                kapak_url,
+                icerik_turu,
+                yayin_yili
+              )
             )
-          )
-        `)
-        .eq("liste_id", id)
-        .single();
+          `)
+          .eq("liste_id", id)
+          .single();
 
-      if (error) {
-        console.error(error);
+        if (error) {
+          console.error(error);
+          setYukleniyor(false);
+          return;
+        }
+
+        const icerikler =
+          (data.OzelListeIcerikleri || [])
+            .map((x) => x.Icerikler)
+            .filter(Boolean) || [];
+
+        setListe({
+          liste_id: data.liste_id,
+          liste_adi: data.liste_adi,
+          aciklama: data.aciklama,
+          sahibi: data.Kullanicilar?.kullanici_adi || "",
+          icerikler,
+        });
         setYukleniyor(false);
-        return;
+      } catch (e) {
+        console.error(e);
+        setYukleniyor(false);
       }
-
-      const icerikler =
-        (data.OzelListeIcerikleri || [])
-          .map((x) => x.Icerikler)
-          .filter(Boolean) || [];
-
-      setListe({
-        liste_id: data.liste_id,
-        liste_adi: data.liste_adi,
-        aciklama: data.aciklama,
-        sahibi: data.Kullanicilar?.kullanici_adi || "",
-        icerikler,
-      });
-      setYukleniyor(false);
     };
 
     getir();
-  }, [id]);
+  }, [id, navigate]);
+
 
   if (yukleniyor) {
     return (

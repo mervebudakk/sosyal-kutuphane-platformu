@@ -19,6 +19,7 @@ const KutuphanemSayfasi = () => {
   });
 
   const [ozelListeler, setOzelListeler] = useState([]);
+  const [begendiklerim, setBegendiklerim] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
 
   // SADECE KENDİ KÜTÜPHANEMİ GETİR
@@ -86,7 +87,8 @@ const KutuphanemSayfasi = () => {
       // 4) Özel listeler
       const { data: ozelListeData, error: ozelErr } = await supabase
         .from("OzelListeler")
-        .select(`
+        .select(
+          `
           liste_id,
           liste_adi,
           aciklama,
@@ -99,7 +101,8 @@ const KutuphanemSayfasi = () => {
               yayin_yili
             )
           )
-        `)
+        `
+        )
         .eq("kullanici_id", kullaniciId)
         .order("olusturulma_tarihi", { ascending: false });
 
@@ -115,6 +118,32 @@ const KutuphanemSayfasi = () => {
           }))
         );
       }
+
+            // 5) Beğendiğim içerikler (IcerikBegenileri'nden)
+      const { data: begeniData, error: begeniErr } = await supabase
+        .from("IcerikBegenileri")
+        .select(
+          `
+          icerik_id,
+          Icerikler (
+            icerik_id,
+            baslik,
+            kapak_url,
+            icerik_turu,
+            yayin_yili
+          )
+        `
+        )
+        .eq("kullanici_id", kullaniciId);
+
+      if (!begeniErr && begeniData) {
+        const icerikler =
+          begeniData.map((b) => b.Icerikler).filter(Boolean) || [];
+        setBegendiklerim(icerikler);
+      } else {
+        setBegendiklerim([]);
+      }
+
 
       setYukleniyor(false);
     };
@@ -236,95 +265,114 @@ const KutuphanemSayfasi = () => {
     </div>
   );
 
-  const OzelListeKarti = ({ liste }) => {
-    const icerikler = liste.icerikler || [];
+  const OzelListeKarti = ({ liste, aktifTur }) => {
+  const icerikler = liste.icerikler || [];
+  const otomatikBegeniListesi = liste.liste_id === "begendiklerim";
 
-    return (
-      <div
-        onClick={() => navigate(`/ozel-liste/${liste.liste_id}`)}
-        style={{
-          background: "#1F1F1F",
-          borderRadius: "6px",
-          border: "1px solid #333",
-          padding: "14px 16px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          cursor: "pointer",
-        }}
-      >
-        <div
-          style={{
-            fontWeight: "bold",
-            color: "white",
-            fontSize: "0.95rem",
-          }}
-        >
-          {liste.liste_adi}
-        </div>
-
-        {liste.aciklama && (
-          <div
-            style={{
-              fontSize: "0.8rem",
-              color: "#AAAAAA",
-            }}
-          >
-            {liste.aciklama}
-          </div>
-        )}
-
-        {icerikler.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginTop: 8,
-            }}
-          >
-            {icerikler.slice(0, 3).map((icerik) => (
-              <div
-                key={icerik.icerik_id}
-                style={{
-                  width: 40,
-                  height: 60,
-                  borderRadius: 4,
-                  overflow: "hidden",
-                  background: "#333",
-                  flexShrink: 0,
-                }}
-              >
-                <img
-                  src={
-                    icerik.kapak_url ||
-                    "https://via.placeholder.com/40x60?text=Kapak"
-                  }
-                  alt={icerik.baslik}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div
-          style={{
-            fontSize: "0.8rem",
-            color: "#F5C518",
-            marginTop: 8,
-          }}
-        >
-          {icerikler.length} içerik
-        </div>
-      </div>
-    );
+  const handleClick = () => {
+    if (otomatikBegeniListesi) {
+      // Film / kitap sekmesine göre detay sayfasına git
+      navigate(`/ozel-liste/begendiklerim?tur=${aktifTur}`);
+    } else {
+      navigate(`/ozel-liste/${liste.liste_id}`);
+    }
   };
 
+  return (
+    <div
+      onClick={handleClick}
+      style={{
+        background: "#151515",
+        borderRadius: "6px",
+        border: "1px solid #333",
+        padding: "12px",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+      }}
+    >
+      <div
+        style={{
+          color: "white",
+          fontSize: "1rem",
+          fontWeight: "bold",
+        }}
+      >
+        {liste.liste_adi}
+      </div>
+      {liste.aciklama && (
+        <div
+          style={{
+            color: "#AAAAAA",
+            fontSize: "0.85rem",
+          }}
+        >
+          {liste.aciklama}
+        </div>
+      )}
+
+      <div style={{ marginTop: "8px" }}>
+        {icerikler.length > 0 ? (
+          <div
+            style={{
+              width: 60,
+              height: 90,
+              borderRadius: 4,
+              overflow: "hidden",
+              background: "#333",
+            }}
+          >
+            <img
+              src={icerikler[0].kapak_url}
+              alt={icerikler[0].baslik}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+          </div>
+        ) : (
+          <div
+            style={{
+              width: 60,
+              height: 90,
+              borderRadius: 4,
+              background: "#222",
+              border: "1px dashed #444",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "0.75rem",
+              color: "#555",
+            }}
+          >
+            {otomatikBegeniListesi ? "Henüz beğeni yok" : "Boş liste"}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          fontSize: "0.8rem",
+          color: "#F5C518",
+          marginTop: "6px",
+        }}
+      >
+        {icerikler.length} içerik
+        {/* otomatik liste yazısı kaldırıldı */}
+      </div>
+    </div>
+  );
+};
+
+
   const aktifTur = aktifSekme === "kitap" ? "kitap" : "film";
+
+  const begendiklerimFiltreli = begendiklerim.filter(
+    (ic) => ic.icerik_turu === aktifTur
+  );
 
   const filtrelenmisOzelListeler = ozelListeler
     .map((l) => ({
@@ -435,9 +483,7 @@ const KutuphanemSayfasi = () => {
             <ListeBasligi
               icon={CheckCircle}
               renk="#10b981"
-              baslik={
-                aktifSekme === "kitap" ? "Okuduklarım" : "İzlediklerim"
-              }
+              baslik={aktifSekme === "kitap" ? "Okuduklarım" : "İzlediklerim"}
               adet={
                 aktifSekme === "kitap"
                   ? listeler.okuduklarim.length
@@ -452,8 +498,7 @@ const KutuphanemSayfasi = () => {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fill, minmax(140px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
                   gap: "15px",
                 }}
               >
@@ -484,9 +529,7 @@ const KutuphanemSayfasi = () => {
             <ListeBasligi
               icon={Clock}
               renk="#F5C518"
-              baslik={
-                aktifSekme === "kitap" ? "Okunacaklar" : "İzlenecekler"
-              }
+              baslik={aktifSekme === "kitap" ? "Okunacaklar" : "İzlenecekler"}
               adet={
                 aktifSekme === "kitap"
                   ? listeler.okunacaklar.length
@@ -501,8 +544,7 @@ const KutuphanemSayfasi = () => {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fill, minmax(140px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
                   gap: "15px",
                 }}
               >
@@ -529,20 +571,50 @@ const KutuphanemSayfasi = () => {
           </div>
         </div>
 
-        {/* ÖZEL LİSTELER */}
+                {/* LİSTELER */}
         <div style={{ marginTop: "50px" }}>
           <h2
             style={{
               color: "white",
               fontSize: "1.4rem",
-              marginBottom: "10px",
               fontWeight: "bold",
             }}
           >
-            Özel Listeler
+            Listeler
           </h2>
 
-          {filtrelenmisOzelListeler.length === 0 ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: "16px",
+              marginTop: "12px",
+            }}
+          >
+            <OzelListeKarti
+              liste={{
+                liste_id: "begendiklerim",
+                liste_adi: "Beğendiklerim",
+                aciklama:
+                  aktifTur === "film"
+                    ? "Beğendiğin filmler burada."
+                    : "Beğendiğin kitaplar burada.",
+                icerikler: begendiklerimFiltreli,
+              }}
+              aktifTur={aktifTur}
+            />
+
+            {filtrelenmisOzelListeler.map((liste) => (
+              <OzelListeKarti
+                key={liste.liste_id}
+                liste={liste}
+                aktifTur={aktifTur}
+              />
+            ))}
+          </div>
+
+          {filtrelenmisOzelListeler.length === 0 && (
             <div
               style={{
                 borderRadius: "6px",
@@ -550,26 +622,14 @@ const KutuphanemSayfasi = () => {
                 padding: "18px",
                 color: "#777",
                 fontSize: "0.9rem",
+                marginTop: "14px",
               }}
             >
-              Henüz bu sekmeye uygun özel liste yok.
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fill, minmax(220px, 1fr))",
-                gap: "16px",
-                marginTop: "12px",
-              }}
-            >
-              {filtrelenmisOzelListeler.map((liste) => (
-                <OzelListeKarti key={liste.liste_id} liste={liste} />
-              ))}
+              Henüz kendi oluşturduğun özel liste yok.
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
