@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../Servisler/supabaseServis';
-import { Star, Clock, Calendar, Film, BookOpen, ArrowLeft, MessageCircle, Check, Plus, Heart, Share2, Send, User } from 'lucide-react';
+import { Star, Clock, Calendar, Film, BookOpen, ArrowLeft, MessageCircle, Check, Plus, Heart, Share2, Send, User, ListPlus, X  } from 'lucide-react';
 
 const IcerikDetaySayfasi = () => {
     const { id } = useParams();
@@ -16,6 +16,12 @@ const IcerikDetaySayfasi = () => {
     const [kullaniciPuani, setKullaniciPuani] = useState(0); 
     const [hoverPuan, setHoverPuan] = useState(0); 
     const [begenildi, setBegenildi] = useState(false); // Sadece UI efekti
+
+    const [ozelListeModalAcik, setOzelListeModalAcik] = useState(false);
+  const [ozelListeler, setOzelListeler] = useState([]);         // {liste_id, liste_adi}
+  const [seciliListeler, setSeciliListeler] = useState([]);     // bu içeriği içeren listelerin id'leri
+  const [ozelListeYukleniyor, setOzelListeYukleniyor] = useState(false);
+  const [yeniListeAdi, setYeniListeAdi] = useState("");
     
     // Yorum State'leri
     const [yorumlar, setYorumlar] = useState([]);
@@ -32,6 +38,105 @@ const IcerikDetaySayfasi = () => {
         const { data: dbUser } = await supabase.from('Kullanicilar').select('kullanici_id').eq('eposta', user.email).single();
         return dbUser ? dbUser.kullanici_id : null;
     };
+
+      // Kullanıcının özel listelerini ve bu içeriğin hangi listelerde olduğunu hazırla
+  const ozelListeleriHazirla = async () => {
+    const userId = await getDbUserId();
+    if (!userId || !icerik) return;
+
+    setOzelListeYukleniyor(true);
+    try {
+      // 1) Kullanıcının tüm özel listeleri
+      const { data: listData, error: listErr } = await supabase
+        .from("OzelListeler")
+        .select("liste_id, liste_adi")
+        .eq("kullanici_id", userId)
+        .order("olusturulma_tarihi", { ascending: true });
+
+      if (listErr) throw listErr;
+      setOzelListeler(listData || []);
+
+      // 2) Bu içerik hangi listelerde var?
+      const { data: bagData, error: bagErr } = await supabase
+        .from("OzelListeIcerikleri")
+        .select("liste_id")
+        .eq("icerik_id", icerik.icerik_id);
+
+      if (bagErr) throw bagErr;
+
+      const secili = (bagData || []).map((b) => b.liste_id);
+      setSeciliListeler(secili);
+
+      setOzelListeModalAcik(true);
+    } catch (e) {
+      console.error(e);
+      alert("Özel listeler yüklenirken bir hata oluştu.");
+    } finally {
+      setOzelListeYukleniyor(false);
+    }
+  };
+
+  // İçeriği listeye ekle / listeden çıkar
+  const handleListeToggle = async (listeId) => {
+    const userId = await getDbUserId();
+    if (!userId || !icerik) return;
+
+    const already = seciliListeler.includes(listeId);
+
+    try {
+      if (already) {
+        // Listeden çıkar
+        const { error } = await supabase
+          .from("OzelListeIcerikleri")
+          .delete()
+          .eq("liste_id", listeId)
+          .eq("icerik_id", icerik.icerik_id);
+
+        if (error) throw error;
+        setSeciliListeler((prev) => prev.filter((id) => id !== listeId));
+      } else {
+        // Listeye ekle
+        const { error } = await supabase.from("OzelListeIcerikleri").insert([
+          {
+            liste_id: listeId,
+            icerik_id: icerik.icerik_id,
+          },
+        ]);
+        if (error) throw error;
+        setSeciliListeler((prev) => [...prev, listeId]);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Liste güncellenirken bir hata oluştu.");
+    }
+  };
+
+  // Modal içinden yeni özel liste oluşturma
+  const handleYeniListeOlustur = async () => {
+    const ad = yeniListeAdi.trim();
+    if (!ad) return;
+
+    const userId = await getDbUserId();
+    if (!userId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("OzelListeler")
+        .insert([{ kullanici_id: userId, liste_adi: ad }])
+        .select("liste_id, liste_adi")
+        .single();
+
+      if (error) throw error;
+
+      // Yeni listeyi liste dizisine ekle
+      setOzelListeler((prev) => [...prev, data]);
+      setYeniListeAdi("");
+    } catch (e) {
+      console.error(e);
+      alert("Yeni liste oluşturulurken bir hata oluştu.");
+    }
+  };
+
 
     // 1. Durum Güncelleme (Okudum/İzledim)
     const durumGuncelle = async (yeniDurum) => {
@@ -110,17 +215,27 @@ const IcerikDetaySayfasi = () => {
 
             if (!error && icerikData) {
                 setIcerik(icerikData);
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const dbUser = await getDbUserId(user);
-                    if (dbUser) {
-                        const { data: durumData } = await supabase.from('KullaniciIcerikDurumlari').select('durum').eq('kullanici_id', dbUser.kullanici_id).eq('icerik_id', id).single();
-                        if (durumData) setMevcutDurum(durumData.durum);
-                        
-                        const { data: puanData } = await supabase.from('KullaniciPuanlari').select('puan_degeri').eq('kullanici_id', dbUser.kullanici_id).eq('icerik_id', id).single();
-                        if (puanData) setKullaniciPuani(puanData.puan_degeri);
-                    }
-                }
+                const userDbId = await getDbUserId();
+if (userDbId) {
+  const { data: durumData } = await supabase
+    .from("KullaniciIcerikDurumlari")
+    .select("durum")
+    .eq("kullanici_id", userDbId)
+    .eq("icerik_id", id)
+    .single();
+
+  if (durumData) setMevcutDurum(durumData.durum);
+
+  const { data: puanData } = await supabase
+    .from("KullaniciPuanlari")
+    .select("puan_degeri")
+    .eq("kullanici_id", userDbId)
+    .eq("icerik_id", id)
+    .single();
+
+  if (puanData) setKullaniciPuani(puanData.puan_degeri);
+}
+
             }
             const { data: yorumData } = await supabase
                 .from('KullaniciYorumlari')
@@ -172,6 +287,25 @@ const IcerikDetaySayfasi = () => {
                             <button onClick={() => durumGuncelle(icerik.icerik_turu === 'film' ? 'izlenecek' : 'okunacak')} style={{ background: okunacakAktif ? '#f59e0b' : 'rgba(255,255,255,0.1)', color: 'white', padding: '16px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', border: okunacakAktif ? 'none' : '2px solid rgba(255, 255, 255, 0.2)' }}>
                                 <Plus size={20} /> Listeye Ekle
                             </button>
+                                                    <button
+                            onClick={ozelListeleriHazirla}
+                            style={{
+                                background: "rgba(255,255,255,0.05)",
+                                color: "white",
+                                padding: "14px",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "10px",
+                                border: "2px dashed rgba(245, 197, 24, 0.6)",
+                            }}
+                        >
+                            <ListPlus size={20} />
+                            Özel Listeye Ekle
+                        </button>
+
                             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                                 <button onClick={() => setBegenildi(!begenildi)} style={{ flex: 1, background: begenildi ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)', border: `2px solid ${begenildi ? 'rgba(239, 68, 68, 0.5)' : 'rgba(255, 255, 255, 0.2)'}`, color: 'white', padding: '12px', borderRadius: '4px', cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
                                     <Heart size={20} fill={begenildi ? '#ef4444' : 'none'} />
@@ -261,6 +395,186 @@ const IcerikDetaySayfasi = () => {
                                 )}
                             </div>
                         </div>
+                              {ozelListeModalAcik && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              background: "#1F1F1F",
+              borderRadius: "8px",
+              border: "1px solid #333",
+              padding: "20px",
+            }}
+          >
+            {/* Modal header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "14px",
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  color: "white",
+                  fontSize: "1.1rem",
+                  fontWeight: "bold",
+                }}
+              >
+                Özel Listelere Ekle
+              </h3>
+              <button
+                onClick={() => setOzelListeModalAcik(false)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#AAAAAA",
+                  cursor: "pointer",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {ozelListeYukleniyor ? (
+              <div style={{ color: "#AAAAAA", padding: "12px 0" }}>
+                Listeler yükleniyor...
+              </div>
+            ) : (
+              <>
+                {/* Var olan listeler */}
+                {ozelListeler.length === 0 ? (
+                  <div
+                    style={{
+                      color: "#AAAAAA",
+                      fontSize: "0.9rem",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Henüz hiç özel listen yok. Aşağıdan yeni bir liste
+                    oluşturabilirsin.
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      marginBottom: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
+                    {ozelListeler.map((liste) => {
+                      const secili = seciliListeler.includes(liste.liste_id);
+                      return (
+                        <button
+                          key={liste.liste_id}
+                          onClick={() => handleListeToggle(liste.liste_id)}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "8px 10px",
+                            borderRadius: "6px",
+                            border: secili
+                              ? "1px solid #F5C518"
+                              : "1px solid #333",
+                            background: secili ? "#332b05" : "#151515",
+                            color: "white",
+                            fontSize: "0.9rem",
+                            cursor: "pointer",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <span>{liste.liste_adi}</span>
+                          {secili && (
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "#F5C518",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              Bu listede
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Yeni liste oluşturma alanı */}
+                <div
+                  style={{
+                    borderTop: "1px solid #333",
+                    paddingTop: "10px",
+                    marginTop: "4px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#AAAAAA",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Yeni liste oluştur
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={yeniListeAdi}
+                      onChange={(e) => setYeniListeAdi(e.target.value)}
+                      placeholder="Liste adı..."
+                      style={{
+                        flex: 1,
+                        background: "#111",
+                        borderRadius: "6px",
+                        border: "1px solid #333",
+                        padding: "8px 10px",
+                        color: "white",
+                        fontSize: "0.9rem",
+                        outline: "none",
+                      }}
+                    />
+                    <button
+                      onClick={handleYeniListeOlustur}
+                      style={{
+                        background: "#F5C518",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "0 14px",
+                        fontWeight: "bold",
+                        fontSize: "0.85rem",
+                        cursor: "pointer",
+                        color: "black",
+                      }}
+                    >
+                      Ekle
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
                     </div>
                 </div>
             </div>
