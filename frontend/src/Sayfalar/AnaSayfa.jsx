@@ -15,8 +15,6 @@ import { useNavigate } from "react-router-dom";
 
 const SAYFA_BOYUTU = 10;
 
-
-
 // Basit relatif zaman helper'ı
 const formatRelativeTime = (tarihStr) => {
   const tarih = new Date(tarihStr);
@@ -52,14 +50,15 @@ const aktiviteMetniOlustur = (aktivite, kullaniciAdi) => {
   return `${kullaniciAdi} bir aktivite gerçekleştirdi`;
 };
 
-
 // Tek bir aktivite kartı
 const AktiviteKarti = ({
   aktivite,
   currentUserId,
   onLikeToggle,
   onCommentSend,
-  navigate,  
+  onCommentUpdate,
+  onCommentDelete,
+  navigate,
 }) => {
   const kullanici = aktivite.Kullanicilar;
   const icerik = aktivite.Icerikler;
@@ -68,11 +67,15 @@ const AktiviteKarti = ({
   const [yorumMetin, setYorumMetin] = useState("");
   const [yorumGonderiliyor, setYorumGonderiliyor] = useState(false);
 
+  const [duzenlenenYorumId, setDuzenlenenYorumId] = useState(null);
+  const [duzenlemeMetni, setDuzenlemeMetni] = useState("");
+  const [duzenlemeYukleniyor, setDuzenlemeYukleniyor] = useState(false);
+
+  const yorumlar = aktivite.AktiviteYorumlari || [];
+
   const begenenler = aktivite.AktiviteBegenileri || [];
   const begeniSayisi = begenenler.length;
-  const benBegendim = begenenler.some(
-    (b) => b.kullanici_id === currentUserId
-  );
+  const benBegendim = begenenler.some((b) => b.kullanici_id === currentUserId);
 
   const handleComment = async () => {
     const trimmed = yorumMetin.trim();
@@ -125,53 +128,53 @@ const AktiviteKarti = ({
           }}
         >
           <div
-      style={{
-        display: "flex",
-        gap: "10px",
-        alignItems: "center",
-        cursor: "pointer",
-      }}
-      onClick={() => navigate(`/kullanici/${kullanici?.kullanici_id}`)}
-    >
-      {/* Avatar */}
-      <div
-        style={{
-          width: "36px",
-          height: "36px",
-          borderRadius: "999px",
-          background: "#333",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#F5C518",
-          fontWeight: "bold",
-          flexShrink: 0,
-        }}
-      >
-        {kullanici?.kullanici_adi
-          ? kullanici.kullanici_adi.charAt(0).toUpperCase()
-          : "U"}
-      </div>
-      <div>
-        <div
-          style={{
-            color: "white",
-            fontWeight: "bold",
-            fontSize: "0.95rem",
-          }}
-        >
-          {kullanici?.kullanici_adi || "Kullanıcı"}
-        </div>
-        <div
-          style={{ color: "#AAAAAA", fontSize: "0.8rem", marginTop: 2 }}
-        >
-          {aktiviteMetniOlustur(
-            aktivite,
-            kullanici?.kullanici_adi || "Kullanıcı"
-          )}
-        </div>
-      </div>
-    </div>
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+              cursor: "pointer",
+            }}
+            onClick={() => navigate(`/kullanici/${kullanici?.kullanici_id}`)}
+          >
+            {/* Avatar */}
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "999px",
+                background: "#333",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#F5C518",
+                fontWeight: "bold",
+                flexShrink: 0,
+              }}
+            >
+              {kullanici?.kullanici_adi
+                ? kullanici.kullanici_adi.charAt(0).toUpperCase()
+                : "U"}
+            </div>
+            <div>
+              <div
+                style={{
+                  color: "white",
+                  fontWeight: "bold",
+                  fontSize: "0.95rem",
+                }}
+              >
+                {kullanici?.kullanici_adi || "Kullanıcı"}
+              </div>
+              <div
+                style={{ color: "#AAAAAA", fontSize: "0.8rem", marginTop: 2 }}
+              >
+                {aktiviteMetniOlustur(
+                  aktivite,
+                  kullanici?.kullanici_adi || "Kullanıcı"
+                )}
+              </div>
+            </div>
+          </div>
 
           <div
             style={{
@@ -332,6 +335,181 @@ const AktiviteKarti = ({
             </button>
           </div>
         )}
+        {/* Mevcut yorumlar */}
+        {yorumlar.length > 0 && (
+  <div
+    style={{
+      marginTop: "10px",
+      paddingTop: "8px",
+      borderTop: "1px solid #333",
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+    }}
+  >
+    {yorumlar.slice(0, 3).map((y) => {
+      const benimYorumum =
+        y.Kullanicilar?.kullanici_id === currentUserId;
+
+      const kaydet = async () => {
+        if (!duzenlemeMetni.trim()) return;
+        setDuzenlemeYukleniyor(true);
+        await onCommentUpdate(
+          aktivite.aktivite_id,
+          y.aktivite_yorum_id,
+          duzenlemeMetni.trim()
+        );
+        setDuzenlemeYukleniyor(false);
+        setDuzenlenenYorumId(null);
+        setDuzenlemeMetni("");
+      };
+
+      return (
+        <div
+          key={y.aktivite_yorum_id}
+          style={{
+            background: "#111",
+            borderRadius: "6px",
+            padding: "6px 8px",
+            fontSize: "0.8rem",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: 2,
+            }}
+          >
+            <span style={{ color: "#F5C518", fontWeight: 600 }}>
+              {y.Kullanicilar?.kullanici_adi || "Kullanıcı"}
+            </span>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <span style={{ color: "#777", fontSize: "0.7rem" }}>
+                {formatRelativeTime(y.olusturulma_tarihi)}
+              </span>
+
+              {benimYorumum && (
+                <>
+                  <button
+                    onClick={() => {
+                      setDuzenlenenYorumId(y.aktivite_yorum_id);
+                      setDuzenlemeMetni(y.yorum_metin);
+                    }}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "#F5C518",
+                      fontSize: "0.7rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Düzenle
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      onCommentDelete(
+                        aktivite.aktivite_id,
+                        y.aktivite_yorum_id
+                      )
+                    }
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "#f87171",
+                      fontSize: "0.7rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Sil
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {duzenlenenYorumId === y.aktivite_yorum_id ? (
+            <div>
+              <textarea
+                value={duzenlemeMetni}
+                onChange={(e) => setDuzenlemeMetni(e.target.value)}
+                style={{
+                  width: "100%",
+                  minHeight: "50px",
+                  background: "#000",
+                  borderRadius: "4px",
+                  border: "1px solid #444",
+                  color: "white",
+                  fontSize: "0.8rem",
+                  padding: "6px 8px",
+                  resize: "vertical",
+                }}
+              />
+              <div
+                style={{
+                  marginTop: 4,
+                  display: "flex",
+                  gap: 8,
+                }}
+              >
+                <button
+                  onClick={kaydet}
+                  disabled={duzenlemeYukleniyor}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "999px",
+                    border: "none",
+                    background: "#F5C518",
+                    color: "#000",
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {duzenlemeYukleniyor ? "Kaydediliyor..." : "Kaydet"}
+                </button>
+                <button
+                  onClick={() => {
+                    setDuzenlenenYorumId(null);
+                    setDuzenlemeMetni("");
+                  }}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "999px",
+                    border: "1px solid #444",
+                    background: "transparent",
+                    color: "#ccc",
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Vazgeç
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: "#DDDDDD" }}>{y.yorum_metin}</div>
+          )}
+        </div>
+      );
+    })}
+
+    {yorumlar.length > 3 && (
+      <div style={{ color: "#888", fontSize: "0.75rem" }}>
+        +{yorumlar.length - 3} yorum daha...
+      </div>
+    )}
+  </div>
+)}
+
       </div>
     </div>
   );
@@ -339,6 +517,7 @@ const AktiviteKarti = ({
 
 const AnaSayfa = () => {
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserName, setCurrentUserName] = useState("");
   const [aktiviteler, setAktiviteler] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState(null);
@@ -364,7 +543,7 @@ const AnaSayfa = () => {
 
         const { data: dbUser, error: dbErr } = await supabase
           .from("Kullanicilar")
-          .select("kullanici_id, kullanici_adi")
+          .select("kullanici_id, kullanici_adi, eposta")
           .eq("eposta", user.email)
           .single();
 
@@ -375,6 +554,9 @@ const AnaSayfa = () => {
         }
 
         setCurrentUserId(dbUser.kullanici_id);
+        setCurrentUserName(
+          dbUser.kullanici_adi || dbUser.eposta?.split("@")[0] || ""
+        );
 
         // İlk sayfa aktiviteleri
         await aktiviteleriGetir(dbUser.kullanici_id, 1, true);
@@ -407,20 +589,26 @@ const AnaSayfa = () => {
     const takipEdilenIds = takipData?.map((t) => t.takip_edilen_id) || [];
     const idListesi = [kullaniciId, ...takipEdilenIds];
 
-    // Aktiviteler + kullanıcı + içerik + beğeni join'i
+    // AnaSayfa.jsx içinde aktiviteleriGetir fonksiyonu
     const { data: aktiviteData, error: aktErr } = await supabase
       .from("Aktiviteler")
       .select(
         `
-        aktivite_id,
-        kullanici_id,
-        icerik_id,
-        aktivite_turu,
-        olusturulma_tarihi,
-        Kullanicilar ( kullanici_id, kullanici_adi ),
-        Icerikler ( icerik_id, baslik, kapak_url, icerik_turu ),
-        AktiviteBegenileri ( kullanici_id )
-      `
+    aktivite_id,
+    kullanici_id,
+    icerik_id,
+    aktivite_turu,
+    olusturulma_tarihi,
+    Kullanicilar ( kullanici_id, kullanici_adi ),
+    Icerikler ( icerik_id, baslik, kapak_url, icerik_turu ),
+    AktiviteBegenileri ( kullanici_id ),
+    AktiviteYorumlari (
+      aktivite_yorum_id,
+      yorum_metin,
+      olusturulma_tarihi,
+      Kullanicilar ( kullanici_id, kullanici_adi )
+    )
+  `
       )
       .in("kullanici_id", idListesi)
       .order("olusturulma_tarihi", { ascending: false })
@@ -477,10 +665,7 @@ const AnaSayfa = () => {
           } else {
             return {
               ...a,
-              AktiviteBegenileri: [
-                ...mevcut,
-                { kullanici_id: currentUserId },
-              ],
+              AktiviteBegenileri: [...mevcut, { kullanici_id: currentUserId }],
             };
           }
         })
@@ -494,19 +679,120 @@ const AnaSayfa = () => {
   // 4) Aktiviteye yorum ekleme
   const handleCommentSend = async (aktivite, yorumMetni) => {
     if (!currentUserId) return;
+
     try {
-      const { error } = await supabase.from("AktiviteYorumlari").insert([
-        {
-          aktivite_id: aktivite.aktivite_id,
-          kullanici_id: currentUserId,
-          yorum_metin: yorumMetni,
-        },
-      ]);
+      const { data, error } = await supabase
+        .from("AktiviteYorumlari")
+        .insert([
+          {
+            aktivite_id: aktivite.aktivite_id,
+            kullanici_id: currentUserId,
+            yorum_metin: yorumMetni,
+          },
+        ])
+        .select(
+          `
+        aktivite_yorum_id,
+        yorum_metin,
+        olusturulma_tarihi,
+        Kullanicilar ( kullanici_id, kullanici_adi )
+      `
+        )
+        .single();
+
       if (error) throw error;
-      // Yorum sayısını istersen burada state'te tutabilirsin (şu an kartta sadece "Yorum Yap" var).
+
+      // Local state’i güncelle (akışta anında görünsün)
+      setAktiviteler((prev) =>
+        prev.map((a) => {
+          if (a.aktivite_id !== aktivite.aktivite_id) return a;
+
+          const mevcutYorumlar = a.AktiviteYorumlari || [];
+
+          // Eğer select’ten data gelmezse yedek olarak kendimiz obje kur
+          const yeniYorum = data || {
+            aktivite_yorum_id: Date.now(),
+            yorum_metin: yorumMetni,
+            olusturulma_tarihi: new Date().toISOString(),
+            Kullanicilar: {
+              kullanici_id: currentUserId,
+              kullanici_adi: currentUserName || "Sen",
+            },
+          };
+
+          return {
+            ...a,
+            AktiviteYorumlari: [yeniYorum, ...mevcutYorumlar],
+          };
+        })
+      );
     } catch (err) {
       console.error(err);
       alert("Yorum gönderilirken hata oluştu.");
+    }
+  };
+
+  const handleCommentUpdate = async (aktiviteId, yorumId, yeniMetin) => {
+    if (!currentUserId) return;
+
+    try {
+      const { error } = await supabase
+        .from("AktiviteYorumlari")
+        .update({ yorum_metin: yeniMetin })
+        .eq("aktivite_yorum_id", yorumId)
+        .eq("kullanici_id", currentUserId); // sadece kendi yorumunu güncellesin
+
+      if (error) throw error;
+
+      // Local state'i güncelle
+      setAktiviteler((prev) =>
+        prev.map((a) => {
+          if (a.aktivite_id !== aktiviteId) return a;
+          return {
+            ...a,
+            AktiviteYorumlari: (a.AktiviteYorumlari || []).map((y) =>
+              y.aktivite_yorum_id === yorumId
+                ? { ...y, yorum_metin: yeniMetin }
+                : y
+            ),
+          };
+        })
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Yorum güncellenirken bir hata oluştu.");
+    }
+  };
+
+  const handleCommentDelete = async (aktiviteId, yorumId) => {
+    if (!currentUserId) return;
+
+    const onay = window.confirm("Yorumu silmek istediğine emin misin?");
+    if (!onay) return;
+
+    try {
+      const { error } = await supabase
+        .from("AktiviteYorumlari")
+        .delete()
+        .eq("aktivite_yorum_id", yorumId)
+        .eq("kullanici_id", currentUserId); // güvenlik için
+
+      if (error) throw error;
+
+      setAktiviteler((prev) =>
+        prev.map((a) => {
+          if (a.aktivite_id !== aktiviteId) return a;
+          return {
+            ...a,
+            AktiviteYorumlari: (a.AktiviteYorumlari || []).filter(
+              (y) => y.aktivite_yorum_id !== yorumId
+            ),
+          };
+        })
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Yorum silinirken bir hata oluştu.");
     }
   };
 
@@ -603,8 +889,8 @@ const AnaSayfa = () => {
             }}
           >
             Henüz akışta gösterilecek bir aktivite yok. <br />
-            Film/kitaplara puan vererek ve yorum yaparak akışını
-            doldurmaya başlayabilirsin.
+            Film/kitaplara puan vererek ve yorum yaparak akışını doldurmaya
+            başlayabilirsin.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -612,10 +898,12 @@ const AnaSayfa = () => {
               <AktiviteKarti
                 key={aktivite.aktivite_id}
                 aktivite={aktivite}
-                currentUserId={currentUserId}
+                currentUserId={currentUserId} 
                 onLikeToggle={handleLikeToggle}
                 onCommentSend={handleCommentSend}
-                navigate={navigate}  
+                onCommentUpdate={handleCommentUpdate} 
+                onCommentDelete={handleCommentDelete} 
+                navigate={navigate}
               />
             ))}
           </div>
