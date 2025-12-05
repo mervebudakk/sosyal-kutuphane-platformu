@@ -19,6 +19,8 @@ const veriyiStandartFormataDonustur = (item, tur) => {
       kapak_url: item.poster_path
         ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
         : null,
+      puan:
+        typeof item.vote_average === "number" ? item.vote_average : null,
     };
   } else if (tur === "kitap") {
     const info = item.volumeInfo;
@@ -31,11 +33,17 @@ const veriyiStandartFormataDonustur = (item, tur) => {
       yayin_yili: info.publishedDate
         ? info.publishedDate.substring(0, 4)
         : "Bilinmiyor",
-      kapak_url: info.imageLinks?.thumbnail?.replace("http:", "https:") || null,
+      kapak_url:
+        info.imageLinks?.thumbnail?.replace("http:", "https:") || null,
+      puan:
+        typeof info.averageRating === "number"
+          ? info.averageRating
+          : null,
     };
   }
   return null;
 };
+
 
 export const hariciFilmleriAra = async (sorgu, page = 1) => {
   if (!TMDB_KEY) throw new Error("TMDb API anahtarı eksik.");
@@ -203,7 +211,6 @@ export const kitaplariFiltreyeGoreGetir = async (
   }
 };
 
-// GÜNCELLEME: .single() hatasını önleyen versiyon
 export const icerigiKaydetVeDetaylariCek = async (tmdbId) => {
   if (!tmdbId || !TMDB_KEY) throw new Error("Eksik bilgi.");
   const url = `${TMDB_URL}/movie/${tmdbId}?api_key=${TMDB_KEY}&language=tr-TR&append_to_response=credits`;
@@ -242,7 +249,7 @@ export const icerigiKaydetVeDetaylariCek = async (tmdbId) => {
   }
 };
 
-// GÜNCELLEME: .single() hatasını önleyen versiyon
+
 export const kitapKaydetVeDetaylariCek = async (googleBookId) => {
   if (!googleBookId || !GOOGLE_BOOKS_KEY) throw new Error("Eksik bilgi.");
   const url = `${GOOGLE_BOOKS_URL}/volumes/${googleBookId}?key=${GOOGLE_BOOKS_KEY}`;
@@ -280,3 +287,108 @@ export const kitapKaydetVeDetaylariCek = async (googleBookId) => {
     throw error;
   }
 };
+
+export const enYuksekPuanliIcerikleriGetir = async (tur = null, limit = 10) => {
+  let query = supabase
+    .from("IcerikIstatistikleri")
+    .select(
+      `
+      icerik_id,
+      ortalama_puan,
+      toplam_oy_sayisi,
+      toplam_liste_sayisi,
+      Icerikler (
+        icerik_id,
+        icerik_turu,
+        baslik,
+        kapak_url,
+        yayin_yili
+      )
+    `
+    )
+    .order("ortalama_puan", { ascending: false })
+    .order("toplam_oy_sayisi", { ascending: false })
+    .limit(limit);
+
+  if (tur) {
+    query = query.eq("Icerikler.icerik_turu", tur);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) return [];
+
+  return data
+    .map((row) => {
+      if (!row.Icerikler) return null;
+      return {
+        ...row.Icerikler,
+        istatistik: {
+          ortalama_puan: row.ortalama_puan,
+          toplam_oy_sayisi: row.toplam_oy_sayisi,
+          toplam_liste_sayisi: row.toplam_liste_sayisi,
+        },
+      };
+    })
+    .filter(Boolean);
+};
+
+export const enPopulerIcerikleriGetir = async (tur = null, limit = 10) => {
+  let query = supabase
+    .from("IcerikBegenileri")
+    .select(
+      `
+      icerik_id,
+      Icerikler (
+        icerik_id,
+        icerik_turu,
+        baslik,
+        kapak_url,
+        yayin_yili
+      )
+    `
+    );
+
+  if (tur) {
+    query = query.eq("Icerikler.icerik_turu", tur);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) return [];
+
+  const sayacMap = new Map();
+
+  data.forEach((row) => {
+    if (!row.Icerikler) return;
+    const key = row.icerik_id;
+    const mevcut = sayacMap.get(key);
+    if (!mevcut) {
+      sayacMap.set(key, {
+        ...row.Icerikler,
+        istatistik: {
+          begeni_sayisi: 1,
+        },
+      });
+    } else {
+      mevcut.istatistik.begeni_sayisi += 1;
+    }
+  });
+
+  const liste = Array.from(sayacMap.values());
+  liste.sort(
+    (a, b) => b.istatistik.begeni_sayisi - a.istatistik.begeni_sayisi
+  );
+
+  return liste.slice(0, limit);
+};
+
+

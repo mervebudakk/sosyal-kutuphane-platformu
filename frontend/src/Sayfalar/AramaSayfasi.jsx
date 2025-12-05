@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Film,
@@ -15,6 +15,8 @@ import {
   kitapKaydetVeDetaylariCek,
   filmleriFiltreyeGoreGetir,
   kitaplariFiltreyeGoreGetir,
+  enYuksekPuanliIcerikleriGetir,
+  enPopulerIcerikleriGetir,
 } from "../Servisler/apiServis";
 
 const tmdbGenreMap = {
@@ -49,8 +51,50 @@ const AramaSayfasi = () => {
   const [aramaModu, setAramaModu] = useState(null);
 
   const [selectedGenre, setSelectedGenre] = useState("");
-  const [selectedDecade, setSelectedDecade] = useState(""); // "2020", "2010" vb.
+  const [selectedDecade, setSelectedDecade] = useState(""); 
   const [sortOption, setSortOption] = useState("popularity_desc");
+
+  const [enYuksekPuanlilar, setEnYuksekPuanlilar] = useState([]);
+  const [enPopulerler, setEnPopulerler] = useState([]);
+  const [vitrinYukleniyor, setVitrinYukleniyor] = useState(false);
+  const [vitrinHata, setVitrinHata] = useState(null);
+
+  const [puanAraligi, setPuanAraligi] = useState("hepsi");
+
+
+  useEffect(() => {
+    let iptalEdildi = false;
+
+    const getir = async () => {
+      setVitrinYukleniyor(true);
+      setVitrinHata(null);
+      try {
+        const tur = aktifKategori === "film" ? "film" : "kitap";
+        const [puanData, populerData] = await Promise.all([
+          enYuksekPuanliIcerikleriGetir(tur, 8),
+          enPopulerIcerikleriGetir(tur, 8),
+        ]);
+        if (!iptalEdildi) {
+          setEnYuksekPuanlilar(puanData);
+          setEnPopulerler(populerData);
+        }
+      } catch (err) {
+        if (!iptalEdildi) {
+          setVitrinHata(err.message);
+        }
+      } finally {
+        if (!iptalEdildi) {
+          setVitrinYukleniyor(false);
+        }
+      }
+    };
+
+    getir();
+
+    return () => {
+      iptalEdildi = true;
+    };
+  }, [aktifKategori]);
 
   const filmTurleri = [
     "Aksiyon",
@@ -104,9 +148,7 @@ const AramaSayfasi = () => {
         } else {
           gelenSonuclar = await hariciKitaplariAra(query, 1);
         }
-      }
-
-      else {
+      } else {
         setAramaModu("filter");
         if (aktifKategori === "film") {
           const decadeStart = selectedDecade
@@ -170,8 +212,28 @@ const AramaSayfasi = () => {
     }
   };
 
+  const filtrelenmisSonuclar =
+  puanAraligi === "hepsi"
+    ? sonuclar
+    : sonuclar.filter((icerik) => {
+        if (icerik.puan == null) return false;
+
+        const hamPuan = icerik.puan;
+        const onlukPuan =
+          aktifKategori === "kitap" ? hamPuan * 2 : hamPuan;
+
+        if (puanAraligi === "9-10") return onlukPuan >= 9;
+        if (puanAraligi === "7-9")
+          return onlukPuan >= 7 && onlukPuan < 9;
+        if (puanAraligi === "5-7")
+          return onlukPuan >= 5 && onlukPuan < 7;
+        if (puanAraligi === "0-5") return onlukPuan < 5;
+        return true;
+      });
+
+
   const dahaFazlaYukle = async () => {
-    if (yukleniyor) return; 
+    if (yukleniyor) return;
 
     const query = aramaTerimi.trim();
 
@@ -197,7 +259,6 @@ const AramaSayfasi = () => {
           yeniSonuclar = await hariciKitaplariAra(query, nextPage);
         }
       } else if (aramaModu === "filter") {
-
         if (aktifKategori === "film") {
           const decadeStart = selectedDecade
             ? parseInt(selectedDecade, 10)
@@ -352,88 +413,400 @@ const AramaSayfasi = () => {
         </div>
 
         {/* FİLTRE VE ARAMA KONTROL PANELİ */}
-                <div style={{ 
-                    background: "#1F1F1F", 
-                    borderRadius: "8px", 
-                    padding: "15px 20px", 
-                    border: "1px solid #333",
-                    maxWidth: "800px", 
-                    margin: "0 auto", 
-                    marginBottom: "40px" 
-                }}>
+        <div
+          style={{
+            background: "#1F1F1F",
+            borderRadius: "8px",
+            padding: "15px 20px",
+            border: "1px solid #333",
+            maxWidth: "800px",
+            margin: "0 auto",
+            marginBottom: "40px",
+          }}
+        >
+          {/* 1. SATIR: FİLTRELEME ÇUBUĞU (Üstte yer almalı) */}
+          <div
+            style={{
+              display: "flex",
+              gap: "15px",
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginBottom: "20px",
+              borderBottom: "1px solid #333",
+              paddingBottom: "15px",
+            }}
+          >
+            <span
+              style={{
+                color: "#F5C518",
+                fontWeight: "bold",
+                fontSize: "0.9rem",
+              }}
+            >
+              Filtrele:
+            </span>
 
-                    {/* 1. SATIR: FİLTRELEME ÇUBUĞU (Üstte yer almalı) */}
-                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '20px', borderBottom: '1px solid #333', paddingBottom: '15px' }}>
-                        
-                        <span style={{ color: '#F5C518', fontWeight: 'bold', fontSize: '0.9rem' }}>Filtrele:</span>
+            {/* Tür seçimi */}
+            <select
+              value={selectedGenre}
+              onChange={(e) => setSelectedGenre(e.target.value)}
+              style={{
+                padding: "6px 10px",
+                background: "#111111",
+                color: "white",
+                borderRadius: "4px",
+                border: "1px solid #444",
+                fontSize: "0.9rem",
+              }}
+            >
+              <option value="">Tür Seç</option>
+              {aktifTurListesi.map((tur) => (
+                <option key={tur} value={tur}>
+                  {tur}
+                </option>
+              ))}
+            </select>
 
-                        {/* Tür seçimi */}
-                        <select
-                            value={selectedGenre}
-                            onChange={(e) => setSelectedGenre(e.target.value)}
-                            style={{ padding: "6px 10px", background: "#111111", color: "white", borderRadius: "4px", border: "1px solid #444", fontSize: "0.9rem" }}
-                        >
-                            <option value="">Tür Seç</option>
-                            {aktifTurListesi.map((tur) => (<option key={tur} value={tur}>{tur}</option>))}
-                        </select>
+            {/* YIL (Onyıl) seçimi */}
+            <select
+              value={selectedDecade}
+              onChange={(e) => setSelectedDecade(e.target.value)}
+              style={{
+                padding: "6px 10px",
+                background: "#111111",
+                color: "white",
+                borderRadius: "4px",
+                border: "1px solid #444",
+                fontSize: "0.9rem",
+              }}
+            >
+              {decadeOptions.map((d) => (
+                <option key={d.value || "hepsi"} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
 
-                        {/* YIL (Onyıl) seçimi */}
-                        <select
-                            value={selectedDecade}
-                            onChange={(e) => setSelectedDecade(e.target.value)}
-                            style={{ padding: "6px 10px", background: "#111111", color: "white", borderRadius: "4px", border: "1px solid #444", fontSize: "0.9rem" }}
-                        >
-                            {decadeOptions.map((d) => (<option key={d.value || "hepsi"} value={d.value}>{d.label}</option>))}
-                        </select>
-                        
-                        {/* Sıralama - En sağa itiyoruz */}
-                        <select
-                            value={sortOption}
-                            onChange={(e) => setSortOption(e.target.value)}
-                            style={{ padding: "6px 10px", background: "#111111", color: "white", borderRadius: "4px", border: "1px solid #444", fontSize: "0.9rem", marginLeft: "auto" }}
-                        >
-                            <option value="popularity_desc">Popülerlik</option>
-                            <option value="rating_desc">Puan (yüksek → düşük)</option>
-                            <option value="year_desc">Yıl (yeni → eski)</option>
-                        </select>
-                    </div>
+            {/* Sıralama - En sağa itiyoruz */}
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+              style={{
+                padding: "6px 10px",
+                background: "#111111",
+                color: "white",
+                borderRadius: "4px",
+                border: "1px solid #444",
+                fontSize: "0.9rem",
+                marginLeft: "auto",
+              }}
+            >
+              <option value="popularity_desc">Popülerlik</option>
+              <option value="rating_desc">Puan (yüksek → düşük)</option>
+              <option value="year_desc">Yıl (yeni → eski)</option>
+            </select>
 
-                    {/* 2. SATIR: ARAMA KUTUSU VE BUTON */}
-                    <div 
-                        style={{ 
-                            display: "flex", 
-                            alignItems: "center", 
-                            background: "#111111", 
-                            borderRadius: "4px", 
-                            border: "1px solid #333",
-                            height: '50px' // Kutu yüksekliğini sabitledik
-                        }}
-                    >
-                        <Search size={24} color="#F5C518" style={{ marginLeft: "15px", marginRight: "10px", flexShrink: 0 }} />
-                        <input
-                            type="text"
-                            value={aramaTerimi}
-                            onChange={(e) => setAramaTerimi(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && aramaYap()}
-                            placeholder={aktifKategori === "film" ? "Matrix, Interstellar..." : "Harry Potter, 1984..."}
-                            style={{ flex: 1, border: "none", outline: "none", fontSize: "1.1rem", padding: "10px 0", background: "transparent", color: "white" }}
-                        />
-                        <button
-                            onClick={aramaYap}
-                            disabled={yukleniyor}
-                            style={{
-                                background: "#F5C518", color: "black", border: "none", 
-                                borderRadius: "0 4px 4px 0",
-                                padding: "0 30px", // Dikey padding'i kaldırdık
-                                fontSize: "1rem", fontWeight: "bold", cursor: yukleniyor ? "not-allowed" : "pointer",
-                                opacity: yukleniyor ? 0.7 : 1, height: '100%',
-                            }}
-                        >
-                            {yukleniyor ? <Loader size={20} /> : "Ara"}
-                        </button>
-                    </div>
+            <select
+  value={puanAraligi}
+  onChange={(e) => setPuanAraligi(e.target.value)}
+  style={{
+    padding: "6px 10px",
+    background: "#111111",
+    color: "white",
+    borderRadius: "4px",
+    border: "1px solid #444",
+    fontSize: "0.9rem",
+  }}
+>
+  <option value="hepsi">Puan (hepsi)</option>
+  <option value="9-10">9 - 10</option>
+  <option value="7-9">7 - 9</option>
+  <option value="5-7">5 - 7</option>
+  <option value="0-5">0 - 5</option>
+</select>
 
+          </div>
+
+          {/* 2. SATIR: ARAMA KUTUSU VE BUTON */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              background: "#111111",
+              borderRadius: "4px",
+              border: "1px solid #333",
+              height: "50px", // Kutu yüksekliğini sabitledik
+            }}
+          >
+            <Search
+              size={24}
+              color="#F5C518"
+              style={{ marginLeft: "15px", marginRight: "10px", flexShrink: 0 }}
+            />
+            <input
+              type="text"
+              value={aramaTerimi}
+              onChange={(e) => setAramaTerimi(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && aramaYap()}
+              placeholder={
+                aktifKategori === "film"
+                  ? "Matrix, Interstellar..."
+                  : "Harry Potter, 1984..."
+              }
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                fontSize: "1.1rem",
+                padding: "10px 0",
+                background: "transparent",
+                color: "white",
+              }}
+            />
+            <button
+              onClick={aramaYap}
+              disabled={yukleniyor}
+              style={{
+                background: "#F5C518",
+                color: "black",
+                border: "none",
+                borderRadius: "0 4px 4px 0",
+                padding: "0 30px", // Dikey padding'i kaldırdık
+                fontSize: "1rem",
+                fontWeight: "bold",
+                cursor: yukleniyor ? "not-allowed" : "pointer",
+                opacity: yukleniyor ? 0.7 : 1,
+                height: "100%",
+              }}
+            >
+              {yukleniyor ? <Loader size={20} /> : "Ara"}
+            </button>
+          </div>
+        </div>
+
+        {sonuclar.length === 0 && !yukleniyor && (
+          <div
+            style={{
+              marginBottom: "40px",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "24px",
+            }}
+          >
+            <div>
+              <h3
+                style={{
+                  color: "#F5C518",
+                  fontSize: "1.3rem",
+                  marginBottom: "12px",
+                  fontWeight: "700",
+                }}
+              >
+                En Yüksek Puanlı{" "}
+                {aktifKategori === "film" ? "Filmler" : "Kitaplar"}
+              </h3>
+              {vitrinHata && (
+                <div
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "0.9rem",
+                    marginBottom: "8px",
+                  }}
+                >
+                  {vitrinHata}
                 </div>
+              )}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                  gap: "16px",
+                }}
+              >
+                {enYuksekPuanlilar.map((icerik) => (
+                  <div
+                    key={icerik.icerik_id}
+                    onClick={() => navigate(`/icerik/${icerik.icerik_id}`)}
+                    style={{
+                      background: "#1F1F1F",
+                      borderRadius: "4px",
+                      overflow: "hidden",
+                      cursor: "pointer",
+                      border: "1px solid #333",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "100%",
+                        paddingTop: "150%",
+                        position: "relative",
+                        background: "#222",
+                      }}
+                    >
+                      <img
+                        src={
+                          icerik.kapak_url ||
+                          "https://via.placeholder.com/300x450?text=Resim+Yok"
+                        }
+                        alt={icerik.baslik}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    </div>
+                    <div style={{ padding: "10px" }}>
+                      <div
+                        style={{
+                          color: "#FFFFFF",
+                          fontSize: "0.9rem",
+                          fontWeight: "bold",
+                          marginBottom: "4px",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {icerik.baslik}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          color: "#AAAAAA",
+                          fontSize: "0.8rem",
+                        }}
+                      >
+                        <span>{icerik.yayin_yili || "-"}</span>
+                        {icerik.istatistik && (
+                          <span>
+                            {icerik.istatistik.ortalama_puan
+                              ? icerik.istatistik.ortalama_puan.toFixed(1)
+                              : "-"}{" "}
+                            ⭐
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {vitrinYukleniyor && enYuksekPuanlilar.length === 0 && (
+                  <div
+                    style={{
+                      color: "#AAAAAA",
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    Yükleniyor...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3
+                style={{
+                  color: "#F5C518",
+                  fontSize: "1.3rem",
+                  marginBottom: "12px",
+                  fontWeight: "700",
+                }}
+              >
+                En Popüler {aktifKategori === "film" ? "Filmler" : "Kitaplar"}
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                  gap: "16px",
+                }}
+              >
+                {enPopulerler.map((icerik) => (
+                  <div
+                    key={icerik.icerik_id}
+                    onClick={() => navigate(`/icerik/${icerik.icerik_id}`)}
+                    style={{
+                      background: "#1F1F1F",
+                      borderRadius: "4px",
+                      overflow: "hidden",
+                      cursor: "pointer",
+                      border: "1px solid #333",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "100%",
+                        paddingTop: "150%",
+                        position: "relative",
+                        background: "#222",
+                      }}
+                    >
+                      <img
+                        src={
+                          icerik.kapak_url ||
+                          "https://via.placeholder.com/300x450?text=Resim+Yok"
+                        }
+                        alt={icerik.baslik}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    </div>
+                    <div style={{ padding: "10px" }}>
+                      <div
+                        style={{
+                          color: "#FFFFFF",
+                          fontSize: "0.9rem",
+                          fontWeight: "bold",
+                          marginBottom: "4px",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {icerik.baslik}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          color: "#AAAAAA",
+                          fontSize: "0.8rem",
+                        }}
+                      >
+                        <span>{icerik.yayin_yili || "-"}</span>
+                        {icerik.istatistik && (
+                          <span>
+                            {icerik.istatistik.begeni_sayisi || 0} beğeni
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {vitrinYukleniyor && enPopulerler.length === 0 && (
+                  <div
+                    style={{
+                      color: "#AAAAAA",
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    Yükleniyor...
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Hata Mesajı */}
         {hata && (
@@ -457,8 +830,8 @@ const AramaSayfasi = () => {
           </div>
         )}
 
-        {/* Sonuçlar */}
-        {sonuclar.length > 0 && (
+                {/* Sonuçlar */}
+        {filtrelenmisSonuclar.length > 0 && (
           <div>
             <h3
               style={{
@@ -478,7 +851,7 @@ const AramaSayfasi = () => {
                 gap: "20px",
               }}
             >
-              {sonuclar.map((icerik, index) => {
+              {filtrelenmisSonuclar.map((icerik, index) => {
                 const durum = kayitDurumu[icerik.harici_id];
                 return (
                   <div
@@ -578,35 +951,11 @@ const AramaSayfasi = () => {
                 );
               })}
             </div>
-            {/* Daha Fazla Göster */}
-            {hasMore && (
-              <div
-                style={{
-                  marginTop: "24px",
-                  display: "flex",
-                  justifyContent: "center",
-                }}
-              >
-                <button
-                  onClick={dahaFazlaYukle}
-                  disabled={yukleniyor}
-                  style={{
-                    padding: "10px 24px",
-                    borderRadius: "20px",
-                    border: "1px solid #F5C518",
-                    background: "#1F1F1F",
-                    color: "#F5C518",
-                    fontWeight: "bold",
-                    cursor: yukleniyor ? "not-allowed" : "pointer",
-                    opacity: yukleniyor ? 0.7 : 1,
-                  }}
-                >
-                  {yukleniyor ? "Yükleniyor..." : "Daha Fazla Göster"}
-                </button>
-              </div>
-            )}
           </div>
         )}
+
+
+        
       </div>
     </div>
   );
