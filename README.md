@@ -106,4 +106,4 @@ Eğer kendi veritabanınızı Supabase üzerinde sıfırdan kurmak isterseniz pr
 2. Daha sonra `trigger.sql` ve `ekstra.sql` içerisindeki fonksiyonları çalıştırarak otomasyonları sağlayın.
 
 ---
-> Geliştiriciler: *[Merve Budak](https://github.com/mervebudakk)*
+> Geliştiriciler: *[Merve Budak](https://github.com/mervebudakk)* *[Dilay Dikbıyık](https://github.com/dilaydikbiyik)*
